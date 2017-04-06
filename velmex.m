@@ -64,9 +64,16 @@ classdef velmex < handle
             for objCount = 1:numObjects
                 
                 currentObj = allObjects( objCount );
+                try
                 nameMatches = ~isempty( ...
                     strfind( currentObj.Port, obj.ResourceName ) );
+                catch
+                    % In this case, object doesn't have a Port field. Since
+                    % it's not a velmex object then, just continue
+                    continue;
+                end
                 
+                % If we do find an existing Velmex object, just delete it
                 if nameMatches
                     delete( allObjects(objCount) );
                 end
