@@ -365,10 +365,7 @@ classdef tekDPO < handle
                 % Get the fraction of the total data displayed
                 fractionOfRecordDisplayed = ...
                     displayedDataWidth./recordDataWidth;
-                
-%                 % Get the number of samples displayed
-%                 samplesDisplayed = ...
-%                     fractionOfRecordDisplayed.*recordLengthPoints;
+
                 
                 % Get position of the center of the window
                 percentOfRecordDisplayed = 100.*fractionOfRecordDisplayed;
