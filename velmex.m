@@ -131,10 +131,37 @@ classdef velmex < handle
                     'It said: ', response...
                     ];
                 return;
-            else
+            end
+            
+            % Create a kill button to stop motors
+            kbf = figure();
+            set( kbf, ...
+                'MenuBar', 'none', ...
+                'ToolBar', 'none', ...
+                'NumberTitle', 'off', ...
+                'Name', 'Stop Motors', ...
+                'Resize', 'off', ...
+                'Position', [100, 100, 400, 200], ...
+                'Color', [1, 1, 1], ...
+                'Tag', 'KillButtonFigure', ...
+                'CloseRequestFcn', @obj.preventFigureClose ...
+                );
+            
+            killButton = uicontrol( ...
+                'Units', 'Normalized', ...
+                'Style', 'pushbutton', ...
+                'BackgroundColor', 0.8.*[1, 0, 0], ...
+                'ForegroundColor', [1, 1, 1], ...
+                'Position', [0.1, 0.25, 0.8, 0.6], ...
+                'String', 'STOP MOTORS', ...
+                'FontSize', 28, ...
+                'FontWeight', 'Bold', ...
+                'Callback', @obj.killCallback ...
+                );
+                
+            
                 % Otherwise, return success
                 result = 0;
-            end
             
         end
         % -----------------------------------------------------------------
@@ -533,6 +560,54 @@ classdef velmex < handle
         end
         % -----------------------------------------------------------------
         
+        % Function to display kill button if it's been closed -------------
+        function [ result ] = showKillButton( obj )
+            
+            % Initialize
+            result = NaN;
+            
+            % Check if the kill button figure already exists
+            buttonExists = ~isempty( ...
+                findobj( 'Tag', 'KillButtonFigure' ) );
+            if buttonExists
+                result = 1;
+                return;
+            end
+            
+            % Create a kill button to stop motors
+            kbf = figure();
+            set( kbf, ...
+                'MenuBar', 'none', ...
+                'ToolBar', 'none', ...
+                'NumberTitle', 'off', ...
+                'Name', 'Stop Motors', ...
+                'Resize', 'off', ...
+                'Position', [100, 100, 400, 200], ...
+                'Color', [1, 1, 1], ...
+                'Tag', 'KillButtonFigure', ...
+                'CloseRequestFcn', @obj.preventFigureClose ...
+                );
+            
+            killButton = uicontrol( ...
+                'Units', 'Normalized', ...
+                'Style', 'pushbutton', ...
+                'BackgroundColor', 0.8.*[1, 0, 0], ...
+                'ForegroundColor', [1, 1, 1], ...
+                'Position', [0.1, 0.25, 0.8, 0.6], ...
+                'String', 'STOP MOTORS', ...
+                'FontSize', 28, ...
+                'FontWeight', 'Bold', ...
+                'Callback', @obj.killCallback ...
+                );
+            
+            
+            % Otherwise, return success
+            result = 0;
+            
+            
+        end
+        % -----------------------------------------------------------------
+        
         % Function to kill all motor operation ----------------------------
         function [result, response] = kill( obj )
             
@@ -605,15 +680,71 @@ classdef velmex < handle
         end
         % -----------------------------------------------------------------
         
+        % ============== Callback Functions for UI Button ================
+        
+        % Function to kill all motor operation ----------------------------
+        function killCallback( obj, src, evnt )
+            
+            % Assemble kill command
+            killCommand = ['F,C,G,K'];
+            expectedResponse = '';
+                
+            % Send kill command
+            [response, timedOut] = sendCommandAndWait( ...
+                obj, killCommand, expectedResponse, 2 );
+            
+            % Make sure device responed as expected
+            if timedOut
+                result = [ ...
+                    'Command timed out trying to kill operation. ', ...
+                    'Velmex said: ' response ];
+            else
+                % Return 0 to indicate no errors
+                result = 0;
+            end
+                
+            
+        end
+        % -----------------------------------------------------------------
+                
+        % Function to make kill button persistent -------------------------
+        function preventFigureClose( obj, src, evnt )
+            
+            % Make sure user really wants to kill
+            [ userChoice ] = questdlg( ...
+                [ 'It''s a good idea to have this button visible. ', ...
+                'Are you sure you want to close? ', ...
+                '[Motors can be stopped with the .kill command]' ], ...
+                'Are you sure?', ...
+                'Stay Visible', 'Close Anyway', 'Stay Visible' ...
+                );
+            
+            % Warn user
+            switch userChoice
+                case 'Stay Visible'
+                    % Do nothing
+                case 'Close Anyway'
+                    % Close window
+                    figureObject = findobj( 'Tag', 'KillButtonFigure' );
+                    figureObject.delete;
+            end
+            
+        end
+        % -----------------------------------------------------------------
+        
         % Class destructor -----------------------------------------------
         function delete( obj )
            
             % Close the connection
             fclose( obj.DeviceObject );
             
-            % Delete the object
-            delete( obj );
-            
+            % Close the kill button
+            figureObject = findobj( 'Tag', 'KillButtonFigure' );
+            if ~isempty( figureObject )
+                close( figure( figureObject.Number ) );
+                figureObject.delete;
+            end
+               
         end
         % -----------------------------------------------------------------
         

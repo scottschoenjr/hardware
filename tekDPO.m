@@ -189,31 +189,34 @@ classdef tekDPO < handle
             % Clear previous buffer
             flushinput( obj.DeviceObject );
             
+            % Turn off data header
+            fprintf( obj.DeviceObject, ...
+                'HEAD 0'); 
+            % Set source channel
+            fprintf( obj.DeviceObject, ...
+                ['DATA:SOURCE CH', num2str(channelNumber)] );
+
+%             % ASCII encoding for now
+%             fprintf( obj.DeviceObject, ...
+%                 'DATA:ENCDG ASCII' );
+% 
+            % Now set the receive parameters
+            fprintf( obj.DeviceObject, ...
+                'WFMInpre:ENCDG RPB' );
+            fprintf( obj.DeviceObject, ...
+                'WFMInpre:BYT_Nr 2' );
+            fprintf( obj.DeviceObject, ...
+                'WFMInpre:BIT_Nr 2' );
+            
             % Set the number of points
             fprintf( obj.DeviceObject, ...
                 ['DATA:START ', num2str(startPoint)] ); 
             fprintf( obj.DeviceObject, ...
                 ['DATA:STOP ', num2str(numPoints)] ); 
             
-            % Turn off data header
+            % Transfer waveform preamble
             fprintf( obj.DeviceObject, ...
-                'HEAD 0'); 
-            % Set source channel
-            fprintf( obj.DeviceObject, ...
-                ['DARA:SOURCE CH', num2str(channelNumber)] );
-            % Set data length
-            fprintf( obj.DeviceObject, ...
-                ['HORIZONTAL:RECORDLENGTH ' num2str(numPoints)]);
-
-            % ASCII encoding for now
-            fprintf( obj.DeviceObject, ...
-                'DATA:ENCDG ASCII' );
-% 
-%             % Now set the receive parameters
-%             fprintf( obj.DeviceObject, ...
-%                 'WFMInpre:ENCDG RPB' );
-%             fprintf( obj.DeviceObject, ...
-%                 'WFMInpre:BYT_Nr 2' );
+                'WFMOutpre?' );
 %             
 %             % Use binary encoding (2 Byte samples, MSB first)
 %             fprintf( obj.DeviceObject, ...
@@ -224,7 +227,7 @@ classdef tekDPO < handle
 %                 'DATA:ENCDG RPB; WIDTH 2' );
 %             fprintf( obj.DeviceObject, ...
 %                 'DATA:WIDTH 2' );
-%             
+            
             
             % Get the data from the scope
             fprintf(obj.DeviceObject, 'CURVE?');
@@ -365,7 +368,6 @@ classdef tekDPO < handle
                 % Get the fraction of the total data displayed
                 fractionOfRecordDisplayed = ...
                     displayedDataWidth./recordDataWidth;
-
                 
                 % Get position of the center of the window
                 percentOfRecordDisplayed = 100.*fractionOfRecordDisplayed;
@@ -390,9 +392,22 @@ classdef tekDPO < handle
                     recordLengthPoints );
                 
                 % Get the data
-                [ timeVector, signalVector, result ] = ...
+                [ rawTimeVector, signalVector, result ] = ...
                     obj.saveData( channelNumber, ...
                     startingSample, endingSample );
+                
+                % Now account for time scaling and offset from zoom
+                scaledTimeVector = rawTimeVector.*fractionOfRecordDisplayed;
+                timeOffset = firstPointFraction.*max( rawTimeVector );
+                timeVector = timeOffset + scaledTimeVector;
+                
+                %%% TODO %%%
+                % Add "zoomInfo" struct to be returned which includes
+                % information about the offset, zoom level, etc. Not sure
+                % it's necessary right now, but might be useful at some
+                % point.
+                %%%%%%%%%%%%
+                
                 return;
                 
             end
