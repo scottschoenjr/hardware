@@ -65,12 +65,27 @@ classdef tekDPO < handle
             result = '';
             
             % Try to create object
-            try 
+            try
                 scopeDeviceObject = ...
                     visa( obj.ManufacturerID, obj.ResourceName );
             catch
-                result = 'Couldn''t create device object.';
-                return;
+                
+                % If it didn't work, try treating it as an Agilent object.
+                % This seems to work for now
+                try
+                    scopeDeviceObject = ...
+                        visa( 'agilent', obj.ResourceName );
+                catch
+                    
+                    % If that didn't work, just give up
+                    result = 'Couldn''t create device object.';
+                    return;
+                    
+                end
+                
+                result = [ 'Warning: Treating as an Agilent object.\n', ...
+                    '(Not sure if this will cause problems or not).' ];
+                
             end
             
             % Update object properties
