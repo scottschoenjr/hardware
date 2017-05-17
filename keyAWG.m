@@ -178,7 +178,7 @@ classdef keyAWG < handle
             mode   = lower(mode);
             
             % If not (or wrongly) specified, set mode to trigger mode
-            invalidMode = ismember( mode, ...
+            invalidMode = ~ismember( mode, ...
                 {'trigger','trig','t', 'gated','gate','g'} );
             if nargin < 5 || invalidMode
                 mode = 'trigger';
@@ -260,8 +260,7 @@ classdef keyAWG < handle
             modeType=lower(modeType);
             invalidMode = ~ismember( modeType, ...
                 {'ext','external','e', ... % External
-                 'imm','immediate','i', ... % Internal
-                 'im','manual','man','m' ...% Manual 
+                 'imm','immediate','i' ... % Internal
                  } );
             if invalidMode
                 result='Invalid mode specified';
@@ -269,13 +268,11 @@ classdef keyAWG < handle
             end
             
             % Assemble command for that mode type
-            switch mode
+            switch modeType
                 case {'ext','external','e'}
                     modeCommand = 'TRIGger:SOURce EXTernal';
                 case {'imm','immediate','i','im'}
                     modeCommand = 'TRIGger:SOURce IMMediate';
-                case {'manual','man','m'}
-                    modeCommand = 'TRIGger:SOURce MANual';
             end
             
             % Send command
@@ -285,14 +282,52 @@ classdef keyAWG < handle
         % -----------------------------------------------------------------
         
         % Function to set voltage -----------------------------------------
-        function [result] = setVoltage( obj, voltage )
+        function [result] = setVoltage( obj, voltage, voltageMode )
             
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             % TODO: Set voltage specification
             % (e.g., peak-to-peak, RMS, etc.)
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            if nargin < 3
+                voltageMode = 'Vpp';
+            else
+                voltageMode = lower(voltageMode);
+            end
             
+            % If not (or wrongly) specified, set mode to trigger mode
+            invalidMode = ~ismember( voltageMode, ...
+                {'vpp','peaktopeak','pktopk', ... % Peak to peak
+                 'vrms', 'rms', ... % RMS
+                 'dbm' ... % DBM
+                 } );
+            if invalidMode
+                voltageMode = 'Vpp';
+            end
+            
+            switch voltageMode
+                case {'vpp','peaktopeak','pktopk'}
+                    voltageMode = 'Vpp';
+                case {'vrms', 'rms'}
+                    voltageMode = 'Vrms';
+                case {'dbm'}
+                    voltageMode = 'dBm';
+            end
+            
+            % Assemble command
+            command = ['VOLT:UNIT ', voltageMode];
+            
+            % Send mode command
+            modeResult = sendCommand( obj, command );
+            
+            % If this failed, notify user
+            if ~isequal( modeResult, 0 )
+                result = modeResult;
+                return;
+            end
+            
+            % Send voltage command to AWG
+                        
             % Format as decimal
             fmtSpec = '%08.3f';
             
@@ -301,7 +336,7 @@ classdef keyAWG < handle
                 sprintf( fmtSpec, voltage ) ...
                 ];
             
-            % Send to AWG
+            % Return result directly
             result = sendCommand( obj, command );
             
         end
