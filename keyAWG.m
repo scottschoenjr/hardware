@@ -21,7 +21,7 @@ classdef keyAWG < handle
     methods
         
         % Class constructor -----------------------------------------------
-        function obj = KeyAWG()
+        function obj = keyAWG()
             
             % Initialize values
             obj.Manufacturer = 'Agilent Technologies';
