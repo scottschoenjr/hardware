@@ -70,7 +70,7 @@ classdef keyAWG < handle
             
             % Specify buffer sizes
             inputBufferSize = 2^10; % Shouldn't need any, but still.
-            outputBufferSize = 2^16; 
+            outputBufferSize = 2^16;
             
             % Try and set default parameters
             try
@@ -242,7 +242,7 @@ classdef keyAWG < handle
                     'AWG said: "', phaseResult, '".'];
                 return;
             end
-
+            
             % Set trigger source and enable bust mode
             sendCommand( obj,'TRIGger:SOURce IMMediate');
             sendCommand( obj,'BURSt:STATe ON');
@@ -252,12 +252,44 @@ classdef keyAWG < handle
             
         end
         
+        
+        % Function to set trigger mode --------------------------------------
+        function [ result ] = setTriggerMode( obj, modeType)
+            
+            % Make sure a valid mode was specified
+            modeType=lower(modeType);
+            invalidMode = ~ismember( modeType, ...
+                {'ext','external','e', ... % External
+                 'imm','immediate','i', ... % Internal
+                 'im','manual','man','m' ...% Manual 
+                 } );
+            if invalidMode
+                result='Invalid mode specified';
+                return;
+            end
+            
+            % Assemble command for that mode type
+            switch mode
+                case {'ext','external','e'}
+                    modeCommand = 'TRIGger:SOURce EXTernal';
+                case {'imm','immediate','i','im'}
+                    modeCommand = 'TRIGger:SOURce IMMediate';
+                case {'manual','man','m'}
+                    modeCommand = 'TRIGger:SOURce MANual';
+            end
+            
+            % Send command
+            result = sendCommand( obj, modeCommand );
+            
+        end
+        % -----------------------------------------------------------------
+        
         % Function to set voltage -----------------------------------------
         function [result] = setVoltage( obj, voltage )
             
             
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            % TODO: Set voltage specification 
+            % TODO: Set voltage specification
             % (e.g., peak-to-peak, RMS, etc.)
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             
@@ -294,7 +326,7 @@ classdef keyAWG < handle
         
         % Function to set output load -------------------------------------
         function [result] = setOutputLoad( obj, outputLoad )
-                        
+            
             % Format as decimal
             fmtSpec = '%08.3f';
             
