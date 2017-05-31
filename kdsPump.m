@@ -24,7 +24,7 @@ classdef kdsPump < handle
     
     % Set static properties
     properties (Constant, Hidden)
-        % Any persisten properties
+        % Any persistent properties
         
     end
     
@@ -61,8 +61,8 @@ classdef kdsPump < handle
                 
                 currentObj = allObjects( objCount );
                 try
-                nameMatches = ~isempty( ...
-                    strfind( currentObj.Port, obj.ResourceName ) );
+                    nameMatches = ~isempty( ...
+                        strfind( currentObj.Port, obj.ResourceName ) );
                 catch
                     % In this case, object doesn't have a Port field. Since
                     % it's not a velmex object then, just continue
@@ -106,9 +106,14 @@ classdef kdsPump < handle
             obj.DeviceObject = pumpObject;
             
             % Open port
-            fopen( obj.DeviceObject );
+            try
+                fopen( obj.DeviceObject );
+            catch
+                result = 'Couldn''t open serial connection with the pump.';
+                return;
+            end
             
-            % Make sure port was opened
+            % Make sure port was opened properly
             portOpenedSuccessfully = isequal( ...
                 obj.DeviceObject.status, 'open' );
             if ~portOpenedSuccessfully
@@ -125,15 +130,20 @@ classdef kdsPump < handle
         
         % Function to pass  an arbitrary command to the pump --------------
         function [result, response] = ...
-                sendKdsCommand( obj, command )
+                sendKdsCommand( obj, command, waitForReply, waitTime )
             
-            % Create list of expected responses
-            prompts = { ...
-                ':', '>', '<', '*', '*' };
             
             % Initialize
             result = '';
             response = '';
+            
+            % Default if not specificied
+            if nargin == 3
+                waitTime = 0; % Don't wait
+            elseif nargin == 2
+                waitTime = 0;
+                waitForReply = 0; % No response expected
+            end
             
             % Ensure device is open
             portIsClosed = ...
@@ -147,7 +157,7 @@ classdef kdsPump < handle
             
             % Send command
             [response, timedOut] = sendCommandAndWait( ...
-                obj, command, prompts, 2 );
+                obj, command, waitForReply, waitTime );
             
             % Make sure device responed as expected
             if timedOut
@@ -163,9 +173,9 @@ classdef kdsPump < handle
         
         % Class destructor -----------------------------------------------
         function delete( obj )
-           
+            
             % Actions when device is deleted
-                          
+            
         end
         % -----------------------------------------------------------------
         
@@ -176,7 +186,7 @@ classdef kdsPump < handle
         
         % Function to wait for response from controller
         function [response, timedOut] = sendCommandAndWait( ...
-                obj, command, validResponses, waitFor )
+                obj, command, replyExpected, waitFor )
             
             % Initialize
             timedOut = 0;
@@ -193,32 +203,48 @@ classdef kdsPump < handle
             validResponse = 0;
             timedOut = 0;
             
+            % If we don't expect a reply, just pass command and return
+            if ~replyExpected
+                fprintf( obj.DeviceObject, command);
+                response = '[none expected]';
+                return;
+            end
+            
+            % Otherwise, keep checking for a response
             while ( ~validResponse ) && ( ~timedOut )
                 
                 % Send command
                 fprintf( obj.DeviceObject, command);
                 pause( obj.ComSettings.Timeout ); % Pause for 0.1 seconds
                 
-                % Now as soon as data is sent back, keep checking it until
-                % we get the response we expected, or we time out.
-                dataSent = obj.DeviceObject.BytesAvailable;
-                if dataSent > 0
-                    response = ...
-                        fscanf(obj.DeviceObject, '%s)', dataSent);
-                end
+                % Get response
+                pumpReply = fscanf( obj.DeviceObject );
                 
                 % Update time
                 elapsedTime = toc;
                 
                 % Check the new response
-                if ~isempty( response )
-                    lastLetter = response(end);
-                    validResponse = ismember( lastLetter, validResponses );
-                end                    
+                % Parse reply
+                % \d+     - Any number of numeric digits
+                % :       - Colon
+                % (\w*\s) - Any alphanumeric character followed by a space
+                %           or a period (any number of times)
+                expression = '\d+:(\w*(\s|.))+';
+                [startIndex, endIndex] = regexp( pumpReply, expression);
+                
+                if isempty( startIndex ) || isempty( endIndex )
+                    response = [...
+                        'Unexpected reply format. Pump replied: ', ...
+                        pumpReply ];
+                    return;
+                else
+                    response = pumpReply( startIndex + 3 : endIndex );
+                    validResponse = 1;
+                end
                 
                 % Check if timed out
                 timedOut = ( elapsedTime > waitFor );
-                                
+                
             end
             
             % If we've timed out, the response is returned as read
