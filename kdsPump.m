@@ -159,7 +159,7 @@ classdef kdsPump < handle
             [response, timedOut] = sendCommandAndWait( ...
                 obj, command, waitForReply, waitTime );
             
-            % Make sure device responed as expected
+            % Make sure device responded as expected
             if timedOut
                 result = ['Command timed out, waiting for response. ', ...
                     'Pump said: ' response ];

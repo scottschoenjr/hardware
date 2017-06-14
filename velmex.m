@@ -26,7 +26,7 @@ classdef velmex < handle
     properties (Constant, Hidden)
         
         % Set slider conversion
-        stepsPerMillimeter = 400; % 1 step = 1/400th of a millimeter
+        stepsPerMillimeter = 160; % 1 step = 1/400th of a millimeter
         % Set max travel distance (per command)
         maxTravelDistance = 15; % [mm]
         
@@ -110,7 +110,13 @@ classdef velmex < handle
             obj.DeviceObject = velmexObject;
             
             % Open port
-            fopen( obj.DeviceObject );
+            try
+                fopen( obj.DeviceObject );
+            catch
+                result = [ 'Port ', obj.ResourceName, ' seems to be '...
+                    'unavailable. Is USB cable disconnected?' ];
+                return;
+            end
             
             % Make sure port was opened
             portOpenedSuccessfully = isequal( ...
