@@ -6,13 +6,13 @@
 %   model 110.
 %
 %
-%              Scott Schoen Jr | Georgia Tech | 20170407
+%      Scott Schoen Jr & Lucas Salvador | Georgia Tech | 20170621
 %
 %**************************************************************************
 
 classdef kdsPump < handle
     
-    % Set slider properties
+    % Set pump properties
     properties
         Manufacturer
         ManufacturerID
@@ -20,6 +20,8 @@ classdef kdsPump < handle
         ResourceName
         DeviceObject
         ComSettings
+        Address
+        WaitTime
     end
     
     % Set static properties
@@ -40,10 +42,12 @@ classdef kdsPump < handle
             obj.Model = '110';
             obj.ResourceName = 'COM5';
             obj.DeviceObject = 'Not Initialized';
+            obj.Address = 0; % Will change response format if not 0!
+            obj.WaitTime = 0.2; % How long to wait after each command
             
             % COM Port default settings
             obj.ComSettings.ComPort = 5;
-            obj.ComSettings.BaudRate = 9600;
+            obj.ComSettings.BaudRate = 115200;
             obj.ComSettings.DataBits = 8;
             obj.ComSettings.Parity = 'none';
             obj.ComSettings.StopBits = 1;
@@ -122,11 +126,228 @@ classdef kdsPump < handle
                 return;
             end
             
-            % Otherwise, return success
+            % Set address to 0
+            try
+                addressString = [ 'address ', num2str( obj.Address ) ];
+                fprintf( obj.DeviceObject, addressString ); % Set
+                fprintf( obj.DeviceObject, 'address' ); % Query
+                fscanf( obj.DeviceObject );
+
+            catch
+                % If something went wrong...
+                result = [ 'Couldn''t set pump address to 0.' ];
+                return;
+            end
+            
+            % If we make it here, return success
             result = 0;
             
         end
         % -----------------------------------------------------------------
+        
+        % Function to stop pump -------------------------------------------
+        function [result, response] = kill( obj )
+            
+            
+            % Initialize
+            result = '';
+            response = '';
+                       
+            % Ensure device is open
+            portIsClosed = ...
+                isequal( obj.DeviceObject, 'Not Initialized' ) || ...
+                isequal( obj.DeviceObject.status, 'closed' );
+            
+            if portIsClosed
+                result = 'SHUT OFF MANUALLY! Pump not connected!';
+                return;
+            end
+            
+            % Send command
+            killCommand = 'stop';
+            [response, ~] = sendCommandAndWait( obj, killCommand, 0, 0 );
+            
+            % Return 0 to indicate no errors
+            result = 0;
+            
+        end
+        % -----------------------------------------------------------------
+        
+         % Function to set the syringe diameter ---------------------------
+        function [result, response] = setSyringeDiameter( obj, diameter_mm )
+            
+            
+            % Initialize
+            result = '';
+            response = '';
+                       
+            % Ensure device is open
+            portIsClosed = ...
+                isequal( obj.DeviceObject, 'Not Initialized' ) || ...
+                isequal( obj.DeviceObject.status, 'closed' );
+            
+            if portIsClosed
+                result = 'Pump not connected. First run .connectPump.';
+                return;
+            end
+            
+            % Check inputs
+            if ~isa( diameter_mm, 'double' )
+                result( 'Diameter must be a double specified in millimeters' );
+                return;
+            end
+            
+            % Send command
+            diameterCommand = sprintf( 'diameter %06.2f', diameter_mm );
+            [response, ~] = ...
+                sendCommandAndWait( obj, diameterCommand, 0, 0 );
+            
+            % Return 0 to indicate no errors
+            result = 0;
+            
+        end
+        % -----------------------------------------------------------------
+        
+        % Function to set the syringe parameters --------------------------
+        function [result, response] = setSyringeParameters( ...
+                obj, diameter_mm, svolume_ml )
+            
+            
+            % Initialize
+            result = '';
+            response = '';
+                       
+            % Ensure device is open
+            portIsClosed = ...
+                isequal( obj.DeviceObject, 'Not Initialized' ) || ...
+                isequal( obj.DeviceObject.status, 'closed' );
+            
+            if portIsClosed
+                result = 'Pump not connected. First run .connectPump.';
+                return;
+            end
+            
+            % Check inputs
+            if ~isa( diameter_mm, 'double' )
+                result( 'Diameter must be a double specified in millimeters' );
+                return;
+            end
+            if ~isa( svolume_ml, 'double' )
+                result( 'Syringe volume must be a double specified in milliliters' );
+                return;
+            end
+            
+            % Send command
+            diameterCommand = sprintf( 'diameter %06.2f', diameter_mm );
+            [response1, ~] = ...
+                sendCommandAndWait( obj, diameterCommand, 0, 0 );
+            svolumeCommand = sprintf( 'svolume %06.2f ml', svolume_ml );
+            [response2, ~] = ...
+                sendCommandAndWait( obj, svolumeCommand, 0, 0 );
+            response = [{response1},{response2}];
+            
+            
+            
+            % Return 0 to indicate no errors
+            result = 0;
+            
+        end
+        
+        % -----------------------------------------------------------------
+        
+        % Function to set continuous mode ---------------------------------
+        function [result, response] = ...
+                runContinuous( obj, volume_ml, rate_mlPerMin, numCycles )
+            
+            
+            % Initialize
+            result = '';
+            response = '';
+            
+            
+            % Ensure device is open
+            portIsClosed = ...
+                isequal( obj.DeviceObject, 'Not Initialized' ) || ...
+                isequal( obj.DeviceObject.status, 'closed' );
+            
+            if portIsClosed
+                result = 'Must connect device (.connectPump) first.';
+                return;
+            end
+            
+            % Set device to infuse-withdraw mode
+            modeCommand = '@load qs iw';
+            [rslt, rply] = obj.sendKdsCommand( modeCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set mode. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            
+            % Set device target volume
+            targetVolumeCommand = sprintf( ....
+                '@tvolume %6.2f ml', volume_ml );
+            [rslt, rply] = obj.sendKdsCommand( targetVolumeCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set target volume. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            
+            % Set the input and output rates
+            infuseRateCommand = sprintf( ....
+                '@irate %6.2f ml/min', rate_mlPerMin );
+            withdrawRateCommand = sprintf( ....
+                '@wrate %6.2f ml/min', rate_mlPerMin );
+            [rslt, rply] = obj.sendKdsCommand( infuseRateCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set infuse rate. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            [rslt, rply] = obj.sendKdsCommand( withdrawRateCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set withdraw rate. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            
+            % Send command
+            runCommand = 'run';
+            [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
+            % for some reason the run command doesn't work sometimes, if
+            % you take one or the other of these run commands away it won't
+            % always work but with both it seems to always work. 
+            [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
+            
+            
+            % Determine how long command will take
+            if numCycles > 100 || numCycles == 0
+                cycleTime = inf; % Run forever
+            else
+                cycleTime = ((rate_mlPerMin./volume_ml).^(-1)).*60; % [s]
+            end
+            
+            killCommand = 'stop';
+            
+            % The problem with this part is that, because of the while
+            % loop, the code won't progress to do anything with the AWG
+            % until all the pump loops are complete
+            
+            % Loop until time is up or until user cancels
+            totalTimeToWait = 2.*cycleTime.*numCycles;
+            elapsedTime = 0;
+%             tic; % Start timer
+%             while ( elapsedTime < totalTimeToWait )
+%                 elapsedTime = toc;
+%             end
+            
+            % Once time is up, send the kill command
+%             [response, ~] = sendCommandAndWait( obj, killCommand, 0, 0 );
+            
+        end
+        % -----------------------------------------------------------------
+        
         
         % Function to pass  an arbitrary command to the pump --------------
         function [result, response] = ...
@@ -158,6 +379,9 @@ classdef kdsPump < handle
             % Send command
             [response, timedOut] = sendCommandAndWait( ...
                 obj, command, waitForReply, waitTime );
+            
+            % Pause for the pump to process command
+            pause( obj.WaitTime );
             
             % Make sure device responded as expected
             if timedOut
@@ -191,21 +415,22 @@ classdef kdsPump < handle
             % Initialize
             timedOut = 0;
             response = '';
-            
+                       
             % Send command
             fprintf( obj.DeviceObject, command );
             
+            % Pause for the pump to process command
+            pause( obj.WaitTime );
+            
             % Keep trying to check that we get the expected response
-            elapsedTime = 0;
             tic;
             
-            % Initialize break flags
+            % Initialize break flag
             validResponse = 0;
-            timedOut = 0;
             
             % If we don't expect a reply, just pass command and return
             if ~replyExpected
-                fprintf( obj.DeviceObject, command);
+%                 fprintf( obj.DeviceObject, command);
                 response = '[none expected]';
                 return;
             end
@@ -223,13 +448,30 @@ classdef kdsPump < handle
                 % Update time
                 elapsedTime = toc;
                 
-                % Check the new response
-                % Parse reply
-                % \d+     - Any number of numeric digits
-                % :       - Colon
-                % (\w*\s) - Any alphanumeric character followed by a space
-                %           or a period (any number of times)
-                expression = '\d+:(\w*(\s|.))+';
+                % If the pump address is not 0, its response will be
+                % prepended with its address in brackets.
+                if ~isequal( obj.Address, 0 )
+                    
+                    % Check the new response
+                    % Parse reply
+                    % \d+     - Any number of numeric digits
+                    % :       - Colon
+                    % (\w*\s) - Any alphanumeric character followed by a space
+                    %           or a period (any number of times)
+                    expression = '\d+:(\w*(\s|.))+';
+                    indexOffset = 3;
+                    
+                else
+                    
+                    % Parse reply
+                    % :       - Colon
+                    % (\w*\s) - Any alphanumeric character followed by a space
+                    %           or a period (any number of times)
+                    expression = ':(\w*(\s|.))+';
+                    indexOffset = 0;
+                    
+                end
+                
                 [startIndex, endIndex] = regexp( pumpReply, expression);
                 
                 if isempty( startIndex ) || isempty( endIndex )
@@ -238,7 +480,7 @@ classdef kdsPump < handle
                         pumpReply ];
                     return;
                 else
-                    response = pumpReply( startIndex + 3 : endIndex );
+                    response = pumpReply( startIndex + indexOffset : endIndex );
                     validResponse = 1;
                 end
                 

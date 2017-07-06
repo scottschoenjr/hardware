@@ -211,10 +211,10 @@ classdef tekDPO < handle
             fprintf( obj.DeviceObject, ...
                 ['DATA:SOURCE CH', num2str(channelNumber)] );
 
-%             % ASCII encoding for now
-%             fprintf( obj.DeviceObject, ...
-%                 'DATA:ENCDG ASCII' );
-% 
+            % ASCII encoding for now
+            fprintf( obj.DeviceObject, ...
+                'DATA:ENCDG ASCII' );
+
             % Now set the receive parameters
             fprintf( obj.DeviceObject, ...
                 'WFMInpre:ENCDG RPB' );
