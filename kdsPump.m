@@ -257,7 +257,7 @@ classdef kdsPump < handle
         
         % Function to set continuous mode ---------------------------------
         function [result, response] = ...
-                runContinuous( obj, volume_ml, rate_mlPerMin, numCycles )
+                runContinuous( obj, volume_ml, rate_mlPerMin )
             
             
             % Initialize
@@ -314,36 +314,116 @@ classdef kdsPump < handle
             
             % Send command
             runCommand = 'run';
+            % For some reason the run command doesn't work sometimes. If
+            % you take one or the other of these run commands away, it 
+            % won't always work, but with both it seems to work always.
             [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
-            % for some reason the run command doesn't work sometimes, if
-            % you take one or the other of these run commands away it won't
-            % always work but with both it seems to always work. 
             [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
             
+            % We're off and running, so return and cede command back to
+            % main script
+            result = 0;
+            return;
+
             
-            % Determine how long command will take
-            if numCycles > 100 || numCycles == 0
-                cycleTime = inf; % Run forever
-            else
-                cycleTime = ((rate_mlPerMin./volume_ml).^(-1)).*60; % [s]
+        end
+        % -----------------------------------------------------------------
+        
+        % Function to set continuous mode ---------------------------------
+        function [result, response] = runOneWay( obj, ...
+                volume_ml, rate_mlPerMin, infuseOrWidthdraw )
+            
+            
+            % Initialize
+            result = '';
+            response = '';
+            
+            
+            % Ensure device is open
+            portIsClosed = ...
+                isequal( obj.DeviceObject, 'Not Initialized' ) || ...
+                isequal( obj.DeviceObject.status, 'closed' );
+            
+            if portIsClosed
+                result = 'Must connect device (.connectPump) first.';
+                return;
             end
             
-            killCommand = 'stop';
+            % Determine appropriate mode
+            if nargin < 3
+                infuseOrWidthdraw = 'i';
+            end
+
+            if isa( infuseOrWidthdraw, 'char' )
+                infuseOrWidthdraw = lower( infuseOrWidthdraw );
+            end
             
-            % The problem with this part is that, because of the while
-            % loop, the code won't progress to do anything with the AWG
-            % until all the pump loops are complete
+            % Set pump to infuse or withdraw mode
+            switch infuseOrWidthdraw
+                % Set to infuse mode
+                case {'i', 'infuse', 1}
+                    infuseOrWithdraw = 1;
+                    modeCommand = '@load qs i';
+                % Set to withdraw mode
+                case {'w', 'withdraw', 2}
+                    infuseOrWithdraw = 2;
+                    modeCommand = '@load qs w';
+                % Return if mode unknown
+                otherwise
+                    result = [ 'Unknown withdraw or infuse mode. ', ...
+                        ' (''w'' or ''i'').' ];
+                    return;
+            end
             
-            % Loop until time is up or until user cancels
-            totalTimeToWait = 2.*cycleTime.*numCycles;
-            elapsedTime = 0;
-%             tic; % Start timer
-%             while ( elapsedTime < totalTimeToWait )
-%                 elapsedTime = toc;
-%             end
+            % Set device to infuse-withdraw mode
+
+            [rslt, rply] = obj.sendKdsCommand( modeCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set mode. Pump said: ', ...
+                    rply ];
+                return;
+            end
             
-            % Once time is up, send the kill command
-%             [response, ~] = sendCommandAndWait( obj, killCommand, 0, 0 );
+            % Set device target volume
+            targetVolumeCommand = sprintf( ....
+                'tvolume %6.4f ml', volume_ml );
+            [rslt, rply] = obj.sendKdsCommand( targetVolumeCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set target volume. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            
+            % Set the flow rate
+            if infuseOrWithdraw == 1                
+                rateCommand = sprintf( ....
+                    'irate %6.2f ml/min', rate_mlPerMin );
+            else
+                rateCommand = sprintf( ....
+                    'wrate %6.2f ml/min', rate_mlPerMin );                
+            end
+            
+            % Pass command
+            [rslt, rply] = obj.sendKdsCommand( rateCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set flow rate. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            
+            % Send command
+            runCommand = 'run';
+            % For some reason the run command doesn't work sometimes. If
+            % you take one or the other of these run commands away, it 
+            % won't always work, but with both it seems to work always.
+            [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
+%             [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
+            
+            % We're off and running, so return and cede command back to
+            % main script
+            result = 0;
+            return;
+
             
         end
         % -----------------------------------------------------------------

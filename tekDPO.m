@@ -17,7 +17,7 @@ classdef tekDPO < handle
         
         % The voltage value is scaled by this amount before it is returned.
         % May be due to an impedance mismatch? Not sure.
-        VOLTAGE_SCALING = 1E-3;;
+        VOLTAGE_SCALING = 1E-2;;
         
     end
     
@@ -354,22 +354,24 @@ classdef tekDPO < handle
             
             % If the sample rate is maxed, the displayed data is treated
             % as the entire record, so we can just call saveData
-            if sampleRateMaxed
+%             if sampleRateMaxed
                 [ timeVector, signalVector, result ] = ...
                     obj.saveData( channelNumber, 0, 1 );
-                return;
-            end
+%                 return;
+%             end
                 
             
             % Check the zoom state. If we're zoomed, we'll need to account
             % for this
-            zoomedIn = str2double( obj.sendCommand('ZOOM:ZOOM:STATE?') );
+%             zoomedIn = str2double( obj.sendCommand('ZOOM:ZOOM:STATE?') );
             
             % If we are zoomed in...
-            if zoomedIn
+%             if zoomedIn
                 
+            if sampleRateMaxed
                 % Get width of displayed data in seconds
-                divisionString = obj.sendCommand('ZOOM:ZOOM:HORIZONTAL:SCALE?');
+%                 divisionString = obj.sendCommand('ZOOM:ZOOM:HORIZONTAL:SCALE?');
+                divisionString = obj.sendCommand('HOR:SCA?');
                 displayedDataWidth = ...
                     10.*str2double( divisionString ); % [s]
                 
@@ -427,10 +429,10 @@ classdef tekDPO < handle
                 
             end
             
-            
-            % If the screen isn't zoomed at all, just get all the data
-            [ timeVector, signalVector, result ] = ...
-                obj.saveData( channelNumber, 0, 1 );
+%             
+%             % If the screen isn't zoomed at all, just get all the data
+%             [ timeVector, signalVector, result ] = ...
+%                 obj.saveData( channelNumber, 0, 1 );
             
             
         end
