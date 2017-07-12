@@ -1,4 +1,4 @@
-% Class definition to make basic operations with Tektroniz DPO 2022B
+% Class definition to make basic operations with Tektronix DPO 2022B
 % oscilloscope a bit easier.
 
 classdef tekDPO < handle
@@ -10,14 +10,15 @@ classdef tekDPO < handle
         Model
         ResourceName
         DeviceObject
+        Verbose
     end
     
     % Set constants
-    properties (SetAccess = private, Constant = true )
+    properties ( SetAccess = private )
         
         % The voltage value is scaled by this amount before it is returned.
         % May be due to an impedance mismatch? Not sure.
-        VOLTAGE_SCALING = 1E-2;;
+        VOLTAGE_SCALING = 1E-2;
         
     end
     
@@ -33,6 +34,7 @@ classdef tekDPO < handle
             obj.Model = 'DPO 2022B';
             obj.ResourceName = 'USB0::0x0699::0x03A1::C030405::0';
             obj.DeviceObject = 'Not Initialized';
+            obj.Verbose = 0; % Turn off by default
             
             % Delete any instances of objects using that resource name
             allObjects = instrfind;
@@ -49,14 +51,14 @@ classdef tekDPO < handle
                     continue;
                 end
                 
-                if nameMatches 
+                if nameMatches
                     delete( allObjects(objCount) );
                 end
             end
             
         end
         % -----------------------------------------------------------------
-
+        
         
         % Function to connect to scope ------------------------------------
         function [obj, result] = connectScope( obj )
@@ -75,6 +77,13 @@ classdef tekDPO < handle
                 try
                     scopeDeviceObject = ...
                         visa( 'agilent', obj.ResourceName );
+                    
+                    % --- Verbose Mode ---
+                    if obj.Verbose
+                        disp( 'TEK: Treating as Agilent device.' );
+                    end
+                    % --------------------
+                    
                 catch
                     
                     % If that didn't work, just give up
@@ -83,7 +92,7 @@ classdef tekDPO < handle
                     
                 end
                 
-                result = [ 'Warning: Treating as an Agilent object.\n', ...
+                result = [ 'Warning: Treating as an Agilent object. ', ...
                     '(Not sure if this will cause problems or not).' ];
                 
             end
@@ -92,14 +101,23 @@ classdef tekDPO < handle
             obj.DeviceObject = scopeDeviceObject;
             
             % Create a large enough buffer to hold all data
-            horizontalRecordLength = 1E6;
-            inputBufferSize = 10.*horizontalRecordLength;
+            horizontalRecordLength = 1E5;
+            bufferSize = 10.*8.*horizontalRecordLength;
             
             % Try and set default parameters
             try
-                obj.DeviceObject.InputBufferSize = inputBufferSize;
+                obj.DeviceObject.InputBufferSize = bufferSize;
+                obj.DeviceObject.OutputBufferSize = bufferSize;
+                
+                % --- Verbose Mode ---
+                if obj.Verbose
+                    disp( [ 'TEK: I/O Buffer sizes set to ', ...
+                        num2str(bufferSize), '.' ] );
+                end
+                % --------------------
+                
             catch
-                result = 'Couldn''t create input buffer.';
+                result = 'Couldn''t size buffers.';
             end
             
             % Try and connect to scope
@@ -112,6 +130,13 @@ classdef tekDPO < handle
             
             % If we're successful, return 0
             if isempty( result )
+                
+                % --- Verbose Mode ---
+                if obj.Verbose
+                    disp( 'TEK: Connected to scope.' );
+                end
+                % --------------------
+                
                 result = 0;
             end
             
@@ -155,19 +180,23 @@ classdef tekDPO < handle
         function [ timeVector, signalVector, result ] = ...
                 saveData( obj, channelNumber, numPoints, startPoint )
             
+            
+            % Clear previous buffers
+            clrdevice( obj.DeviceObject );
+            
             % Initialize
             timeVector = [];
             signalVector = [];
             result = NaN;
             
             % If not specified, use default inputs
-            if nargin < 4
+            if nargin < 4 || startPoint == 0
                 startPoint = 1; % Start at beginning of record
             end
-            if nargin < 3 
+            if nargin < 3
                 numPoints = 0; % Use all points
             end
-            if nargin < 2
+            if nargin < 2 || channelNumber == 0
                 channelNumber = 1;
             end
             
@@ -184,7 +213,7 @@ classdef tekDPO < handle
             
             % Get width of screen
             totalPointsString = ...
-                obj.sendCommand( 'HORIZONTAL:RECORDLENGTH?' ); 
+                obj.sendCommand( 'HORIZONTAL:RECORDLENGTH?' );
             totalPoints = str2double( totalPointsString );
             
             % If default or 0 was entered, set to total width
@@ -193,70 +222,125 @@ classdef tekDPO < handle
             end
             
             % Check if too many points were specified
-            tooManyPoints = numPoints > (totalPoints + startPoint);
+            endPoint = totalPoints + startPoint - 1;
+            tooManyPoints = numPoints > endPoint;
             if tooManyPoints
                 result = [ 'Must specify no more than ', ...
                     num2str(totalPoints), ...
-                    ' points (or increase HOR:RECORDLENGTH).' ];
+                    ' points (or increase HOR:RECO).' ];
                 return;
             end
             
-            % Clear previous buffer
-            flushinput( obj.DeviceObject );
+            % Set start and stop points if necessary
+            fprintf( obj.DeviceObject, ...
+                [ 'DATA:START ', num2str( floor(startPoint) ) ] );
+            fprintf( obj.DeviceObject, ...
+                [ 'DATA:STOP ', num2str( floor(endPoint) ) ] );
+            % --- Verbose Mode ---
+            if obj.Verbose
+                disp( ['TEK: Saving points ', ...
+                    num2str( startPoint ), ' through ', ...
+                    num2str( endPoint ), '.'] );
+            end
+            % --------------------
             
+            
+            %%%%%%%% Downsampling here may be most efficient %%%%%%%%%
+            if 0
+                sampleAt = 0.5E6;
+                % If specified, set the sampling interval
+                if ~isequal( sampleAt, 0 )
+                    
+                    % Get time interval from sampling frequency
+                    dt = 1./sampleAt;
+                    
+                    % Convert to NR3 string format
+                    exponent = floor( log10( dt ) );
+                    multiplier = dt./10.^(exponent);
+                    NR3String = [ num2str(multiplier), 'E', num2str(exponent) ];
+                    
+                    % Set sampling rate
+                    obj.sendCommand( ['WFMInpre:XINcr ', NR3String], 0, 0 );
+                    
+                end
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        
             % Turn off data header
             fprintf( obj.DeviceObject, ...
-                'HEAD 0'); 
+                'HEAD 0');
             % Set source channel
             fprintf( obj.DeviceObject, ...
                 ['DATA:SOURCE CH', num2str(channelNumber)] );
-
+            
             % ASCII encoding for now
             fprintf( obj.DeviceObject, ...
                 'DATA:ENCDG ASCII' );
-
-            % Now set the receive parameters
-            fprintf( obj.DeviceObject, ...
-                'WFMInpre:ENCDG RPB' );
-            fprintf( obj.DeviceObject, ...
-                'WFMInpre:BYT_Nr 2' );
-            fprintf( obj.DeviceObject, ...
-                'WFMInpre:BIT_Nr 2' );
             
-            % Set the number of points
-            fprintf( obj.DeviceObject, ...
-                ['DATA:START ', num2str(startPoint)] ); 
-            fprintf( obj.DeviceObject, ...
-                ['DATA:STOP ', num2str(numPoints)] ); 
+            % --- Verbose Mode ---
+            if obj.Verbose
+                disp( 'TEK: Set data transfer format successfully.' );
+            end
+            % --------------------
             
-            % Transfer waveform preamble
-            fprintf( obj.DeviceObject, ...
-                'WFMOutpre?' );
-%             
-%             % Use binary encoding (2 Byte samples, MSB first)
-%             fprintf( obj.DeviceObject, ...
-%                 'WFMOutre:ENCDG RPB' );
-%             fprintf( obj.DeviceObject, ...
-%                 'WFMOutre:BYT_Nr 2' );
-%             fprintf( obj.DeviceObject, ...
-%                 'DATA:ENCDG RPB; WIDTH 2' );
-%             fprintf( obj.DeviceObject, ...
-%                 'DATA:WIDTH 2' );
+            %             % Now set the receive parameters
+            %             fprintf( obj.DeviceObject, ...
+            %                 'WFMInpre:ENCDG RPB' );
+            %             fprintf( obj.DeviceObject, ...
+            %                 'WFMInpre:BYT_Nr 2' );
+            %             fprintf( obj.DeviceObject, ...
+            %                 'WFMInpre:BIT_Nr 2' );
+            %
+            %             % Set the number of points
+            %             fprintf( obj.DeviceObject, ...
+            %                 ['DATA:START ', num2str(startPoint)] );
+            %             fprintf( obj.DeviceObject, ...
+            %                 ['DATA:STOP ', num2str(numPoints)] );
             
+            %             % Transfer waveform preamble
+            %             fprintf( obj.DeviceObject, ...
+            %                 'WFMOutpre?' );
+            %
+            %             % Use binary encoding (2 Byte samples, MSB first)
+            %             fprintf( obj.DeviceObject, ...
+            %                 'WFMOutre:ENCDG RPB' );
+            %             fprintf( obj.DeviceObject, ...
+            %                 'WFMOutre:BYT_Nr 2' );
+            %             fprintf( obj.DeviceObject, ...
+            %                 'DATA:ENCDG RPB; WIDTH 2' );
+            %             fprintf( obj.DeviceObject, ...
+            %                 'DATA:WIDTH 2' );
+            
+            % --- Verbose Mode ---
+            % Time tranfer if we're in verbose mode
+            if obj.Verbose
+                tic;
+            end
+            % --------------------
             
             % Get the data from the scope
+            clrdevice( obj.DeviceObject ); % Clear buffers to be safe
             fprintf(obj.DeviceObject, 'CURVE?');
             rawSignalString = fscanf( obj.DeviceObject );
             rawSignal = str2num( rawSignalString );
             
+            % --- Verbose Mode ---
+            if obj.Verbose
+                disp( ['TEK: Data transfer complete. Elapsed Time: ', ...
+                    num2str( toc ), ' s.' ] );
+            end
+            % --------------------
+            
             % Get the vertical scale of the scope. There are 8 divisions,
             % so get division and multiply
+            clrdevice( obj.DeviceObject );
             fprintf( obj.DeviceObject, ...
-                ['CH', num2str(channelNumber), ':VOLTS?'] ); 
+                ['CH', num2str(channelNumber), ':VOLTS?'] );
             divisionHeight = str2double( fscanf(obj.DeviceObject) );
             verticalSpan = 8*divisionHeight;
             
             % Get offset
+            clrdevice( obj.DeviceObject );
             fprintf( obj.DeviceObject, ...
                 [ 'CH', num2str(channelNumber), ':POS?'] );
             verticalOffset = (1./8)*(  ...
@@ -268,28 +352,39 @@ classdef tekDPO < handle
                 rawSignal.*(verticalSpan./2) - verticalOffset;
             
             % Scale by appropriate amount
-            signalVoltage = signalVoltage.*obj.VOLTAGE_SCALING; 
+            signalVoltage = signalVoltage.*obj.VOLTAGE_SCALING;
+            
+            % --- Verbose Mode ---
+            % Time if we're in verbose mode
+            if obj.Verbose
+                disp( 'TEK: Obtained voltage scaling (vertical).' );
+            end
+            % --------------------
             
             % Now get time vector
             
             % Determine if we're in delay mode
+            clrdevice( obj.DeviceObject );
             fprintf( obj.DeviceObject, ...
                 'HORIZONTAL:MODE?');
             horizontalMode = fscanf( obj.DeviceObject );
             inDelayMode = strcmp(horizontalMode(1),'D');
             
             % Get the time scaling
+            clrdevice( obj.DeviceObject );
             fprintf( obj.DeviceObject, ...
                 'HORIZONTAL:MAIN:SCALE?');
             tspan_main = 10*( ...
                 str2num( fscanf(obj.DeviceObject) ) ); % TDS380 saves tow screens/returns 0.5*scale
             
             % Get time delay
+            clrdevice( obj.DeviceObject );
             fprintf( obj.DeviceObject, ...
                 'HORIZONTAL:DELAY:SCALE?'); % Get horizontal scale
             tspan_delay = 10*( ...
                 str2num( fscanf(obj.DeviceObject) ) ); % TDS380 saves tow screens/returns 0.5*scale
             
+            clrdevice( obj.DeviceObject );
             fprintf( obj.DeviceObject, ...
                 'HORIZONTAL:DELAY:TIME?'); %Get delay
             tdel = str2num( fscanf(obj.DeviceObject) );
@@ -309,7 +404,14 @@ classdef tekDPO < handle
             timeVector = t;
             signalVector = signalVoltage;
             result = 0;
-
+            
+            % --- Verbose Mode ---
+            % Time if we're in verbose mode
+            if obj.Verbose
+                disp( 'TEK: Obtained time scaling (horizontal).' );
+            end
+            % --------------------
+            
             
         end
         % -----------------------------------------------------------------
@@ -337,10 +439,10 @@ classdef tekDPO < handle
                 channelNumber = abs( round( channelNumber ) );
             end
             
-            % Get number of data points in the record
-            totalPointsString = ...
-                obj.sendCommand( 'HORIZONTAL:RECORDLENGTH?' );
-            totalPoints = str2double( totalPointsString );
+%             % Get number of data points in the record
+%             totalPointsString = ...
+%                 obj.sendCommand( 'HORIZONTAL:RECORDLENGTH?' );
+%             totalPoints = str2double( totalPointsString );
             
             % First, check the horizontal scale. The scope can sample up to
             % 1 GHz, so once we go below a certain time resolution, the
@@ -352,88 +454,72 @@ classdef tekDPO < handle
             sampleRate = str2double( sampleRateString );
             sampleRateMaxed = ( sampleRate == 1E9 );
             
-            % If the sample rate is maxed, the displayed data is treated
+            % If the sample rate is not maxed, the displayed data is treated
             % as the entire record, so we can just call saveData
-%             if sampleRateMaxed
-                [ timeVector, signalVector, result ] = ...
-                    obj.saveData( channelNumber, 0, 1 );
-%                 return;
-%             end
-                
-            
-            % Check the zoom state. If we're zoomed, we'll need to account
-            % for this
-%             zoomedIn = str2double( obj.sendCommand('ZOOM:ZOOM:STATE?') );
-            
-            % If we are zoomed in...
-%             if zoomedIn
-                
-            if sampleRateMaxed
-                % Get width of displayed data in seconds
-%                 divisionString = obj.sendCommand('ZOOM:ZOOM:HORIZONTAL:SCALE?');
-                divisionString = obj.sendCommand('HOR:SCA?');
-                displayedDataWidth = ...
-                    10.*str2double( divisionString ); % [s]
-                
-                % Get the width of the data record in seconds
-                recordLengthPoints = str2double( ...
-                    obj.sendCommand( 'HORIZONTAL:RECORDLENGTH?' ) );
-                recordSamplingRate = str2double( ...
-                    obj.sendCommand( 'HORIZONTAL:SAMPLERATE?' ) );
-                recordDataWidth = recordLengthPoints./recordSamplingRate;
-                
-                % Get the fraction of the total data displayed
-                fractionOfRecordDisplayed = ...
-                    displayedDataWidth./recordDataWidth;
-                
-                % Get position of the center of the window
-                percentOfRecordDisplayed = 100.*fractionOfRecordDisplayed;
-                % Returns the percentage of the record to the left of the
-                % window center
-                percentOffset = str2double( ...
-                    obj.sendCommand( 'ZOOM:ZOOM:HORIZONTAL:POSITION?' ) );
-                % This is then the offset of the left of the window...
-                firstPointFraction = ...
-                    ( percentOffset - percentOfRecordDisplayed./2 )./100;
-                % And the right of the window
-                lastPointFraction = ...
-                    ( percentOffset + percentOfRecordDisplayed./2 )./100;
-                
-                
-                % Now compute the first and last samples to keep
-                startingSample = max( ...
-                    floor( firstPointFraction.*recordLengthPoints ), ...
-                    1 );
-                endingSample = min( ...
-                    ceil( lastPointFraction.*recordLengthPoints ), ...
-                    recordLengthPoints );
-                
-                % Get the data
-                [ rawTimeVector, signalVector, result ] = ...
-                    obj.saveData( channelNumber, ...
-                    startingSample, endingSample );
-                
-                % Now account for time scaling and offset from zoom
-                scaledTimeVector = rawTimeVector.*fractionOfRecordDisplayed;
-                timeOffset = firstPointFraction.*max( rawTimeVector );
-                timeVector = timeOffset + scaledTimeVector;
-                
-                %%% TODO %%%
-                % Add "zoomInfo" struct to be returned which includes
-                % information about the offset, zoom level, etc. Not sure
-                % it's necessary right now, but might be useful at some
-                % point.
-                %%%%%%%%%%%%
-                
+            if ~sampleRateMaxed
+                [ timeVector, signalVector, result ] = obj.saveData();
                 return;
-                
             end
             
-%             
-%             % If the screen isn't zoomed at all, just get all the data
-%             [ timeVector, signalVector, result ] = ...
-%                 obj.saveData( channelNumber, 0, 1 );
             
+            % Get screen width
+            divisionString = obj.sendCommand('HORIZONTAL:SCALE?');
+            displayedDataWidth = ...
+                10.*str2double( divisionString ); % [s]
+            
+            % Get the width of the data record in seconds
+            recordLengthPoints = str2double( ...
+                obj.sendCommand( 'HORIZONTAL:RECORDLENGTH?' ) );
+            recordSamplingRate = str2double( ...
+                obj.sendCommand( 'HORIZONTAL:SAMPLERATE?' ) );
+            recordDataWidth = ...
+                recordLengthPoints./recordSamplingRate; % [s]
+            
+            % Get the fraction of the total data displayed
+            fractionOfRecordDisplayed = ...
+                displayedDataWidth./recordDataWidth;
+            
+            % Get position of the center of the window
+            percentOfRecordDisplayed = 100.*fractionOfRecordDisplayed;
+            % Returns the percentage of the record to the left of the
+            % window center
+            percentOffset = str2double( ...
+                obj.sendCommand( 'ZOOM:ZOOM:HORIZONTAL:POSITION?' ) );
+            % This is then the offset of the left of the window...
+            firstPointFraction = ...
+                ( percentOffset - percentOfRecordDisplayed./2 )./100;
+            % And the right of the window
+            lastPointFraction = ...
+                ( percentOffset + percentOfRecordDisplayed./2 )./100;
+            
+            
+            % Now compute the first and last samples to keep
+            startingSample = max( ...
+                floor( firstPointFraction.*recordLengthPoints ), ...
+                1 );
+            endingSample = min( ...
+                ceil( lastPointFraction.*recordLengthPoints ), ...
+                recordLengthPoints );
+            samplesToSave = endingSample - startingSample;
+            
+            % Get the data
+            [ rawTimeVector, signalVector, result ] = obj.saveData( ...
+                channelNumber, samplesToSave, startingSample );
+            
+            % Now account for time scaling and offset from zoom
+            dt = 1./sampleRate;
+            scaledTimeVector = dt : dt : (samplesToSave.*dt);
+            timeOffset = firstPointFraction.*max( rawTimeVector );
+            timeVector = timeOffset + scaledTimeVector;
+            
+            %%% TODO %%%
+            % Add "zoomInfo" struct to be returned which includes
+            % information about the offset, zoom level, etc. Not sure
+            % it's necessary right now, but might be useful at some
+            % point.
+            %%%%%%%%%%%%
+            
+            return;
             
         end
         % -----------------------------------------------------------------
@@ -463,11 +549,11 @@ classdef tekDPO < handle
             
             % Assemble and pass scale command
             scaleCommand = [ 'HORIZONTAL:SCALE ', NR3String ];
-            fprintf( obj.DeviceObject, scaleCommand ); 
+            fprintf( obj.DeviceObject, scaleCommand );
             
             % Return success
             result = 0;
-
+            
             
         end
         % -----------------------------------------------------------------
@@ -498,7 +584,7 @@ classdef tekDPO < handle
                 result = ...
                     'Something went wrong trying to get the screen width';
             end
-
+            
             
         end
         % -----------------------------------------------------------------
@@ -536,7 +622,7 @@ classdef tekDPO < handle
             
             % Return success
             result = 0;
-
+            
             
         end
         % -----------------------------------------------------------------
@@ -546,42 +632,50 @@ classdef tekDPO < handle
         function [scopeReply] = ...
                 sendCommand( obj, command, delay, waitForResponse )
             
-           % If the delay isn't specified, don't use one
-           if nargin < 3 || ~isa( delay, 'double' )
-              delay = 0; 
-           end
-           
-           % Some commands do not elicit a response from the scope. 
-           % For these cases, we don't to wait for a timeout, so set the
-           % flag here. If not specified, wait for response
-           if nargin < 4 || ~isa( waitForResponse, 'double' )
-              waitForResponse = 1; 
-           end
+            % If the delay isn't specified, don't use one
+            if nargin < 3 || ~isa( delay, 'double' )
+                delay = 0;
+            end
             
-           % Make sure scope is connected
-           if isa( obj.DeviceObject, 'string' )
-               scopeReply = ...
-                   'Not connected to scope. Run .connectScope first';
-               return;
-           end
-              
-           % Make sure we're sending a string
-           if ~isa( command, 'char' )
-               scopeReply = 'Make sure command is a string.';
-               return;
-           end
-           
-           % Send command to scope
-           fprintf( obj.DeviceObject, command );
-           
-           % Get reply
-           pause( delay );
-           if waitForResponse
-               scopeReply = fscanf( obj.DeviceObject );
-           else
-               scopeReply = 0;
-           end
+            % Some commands do not elicit a response from the scope.
+            % For these cases, we don't to wait for a timeout, so set the
+            % flag here. If not specified, wait for response
+            if nargin < 4 || ~isa( waitForResponse, 'double' )
+                waitForResponse = 1;
+            end
+            
+            % Make sure scope is connected
+            if isa( obj.DeviceObject, 'string' )
+                scopeReply = ...
+                    'Not connected to scope. Run .connectScope first';
+                return;
+            end
+            
+            % Make sure we're sending a string
+            if ~isa( command, 'char' )
+                scopeReply = 'Make sure command is a string.';
+                return;
+            end
+            
+            % Clear buffer and send command to scope
+            clrdevice( obj.DeviceObject );
+            fprintf( obj.DeviceObject, command );
+            
+            % Get reply
+            pause( delay );
+            if waitForResponse
+                scopeReply = fscanf( obj.DeviceObject );
+            else
+                scopeReply = 0;
+            end
             
         end
+        
+        
+        % Class destructor
+        function delete(obj)
+            obj.disconnectScope();
+        end
+        
     end
 end

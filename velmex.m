@@ -28,7 +28,7 @@ classdef velmex < handle
         % Set slider conversion
         stepsPerMillimeter = 160; % 1 step = 1/400th of a millimeter
         % Set max travel distance (per command)
-        maxTravelDistance = 15; % [mm]
+        maxTravelDistance = 50; % [mm]
         
     end
     
@@ -461,11 +461,11 @@ classdef velmex < handle
                 % Parse value from VXM response
                 
                 % Get response from serial object
-                vxmReposnse = fscanf( obj.DeviceObject );
+                vxmResponse = fscanf( obj.DeviceObject );
                 
                 % Find the sign of the position
-                plusSignIndex = strfind( vxmReposnse, '+' );
-                minusSignIndex = strfind( vxmReposnse, '-' );
+                plusSignIndex = strfind( vxmResponse, '+' );
+                minusSignIndex = strfind( vxmResponse, '-' );
                 
                 if isempty( plusSignIndex ) && isempty( minusSignIndex )
                     
@@ -486,12 +486,12 @@ classdef velmex < handle
                     
                     % Make sure sign is correct
                     motorPosition_steps = str2double( ...
-                        vxmReposnse( plusSignIndex + 1 : end ) );
+                        vxmResponse( plusSignIndex + 1 : end ) );
                     
                 elseif ~isempty( minusSignIndex )
                     
                     motorPosition_steps = -1.*str2double( ...
-                        vxmReposnse( minusSignIndex + 1 : end ) );
+                        vxmResponse( minusSignIndex + 1 : end ) );
                     
                 else
                     % Unknown read problem
@@ -677,7 +677,7 @@ classdef velmex < handle
             % Make sure device responed as expected
             if timedOut
                 result = ['Command timed out, waiting for response: ', ...
-                    expectedRespnse, '. Velmex said: ' response ];
+                    expectedResponse, '. Velmex said: ' response ];
             else
                 % Return 0 to indicate no errors
                 result = 0;
