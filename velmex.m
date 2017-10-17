@@ -20,6 +20,7 @@ classdef velmex < handle
         ResourceName
         DeviceObject
         ComSettings
+        StopButton
     end
     
     % Set static properties
@@ -54,6 +55,10 @@ classdef velmex < handle
             obj.ComSettings.Terminator = 'CR';
             obj.ComSettings.Timeout = 0.1;
             
+            % Set the button to off initially. It can be enabled by setting
+            % this to 1 before connecting the object
+            obj.StopButton = 0;
+            
             % TODO: Add set.ComSettings function to check values when
             %       updated (e.g., that Terminator is a string).
             
@@ -65,8 +70,8 @@ classdef velmex < handle
                 
                 currentObj = allObjects( objCount );
                 try
-                nameMatches = ~isempty( ...
-                    strfind( currentObj.Port, obj.ResourceName ) );
+                    nameMatches = ~isempty( ...
+                        strfind( currentObj.Port, obj.ResourceName ) );
                 catch
                     % In this case, object doesn't have a Port field. Since
                     % it's not a velmex object then, just continue
@@ -139,35 +144,37 @@ classdef velmex < handle
                 return;
             end
             
-            % Create a kill button to stop motors
-            kbf = figure();
-            set( kbf, ...
-                'MenuBar', 'none', ...
-                'ToolBar', 'none', ...
-                'NumberTitle', 'off', ...
-                'Name', 'Stop Motors', ...
-                'Resize', 'off', ...
-                'Position', [100, 100, 400, 200], ...
-                'Color', [1, 1, 1], ...
-                'Tag', 'KillButtonFigure', ...
-                'CloseRequestFcn', @obj.preventFigureClose ...
-                );
-            
-            killButton = uicontrol( ...
-                'Units', 'Normalized', ...
-                'Style', 'pushbutton', ...
-                'BackgroundColor', 0.8.*[1, 0, 0], ...
-                'ForegroundColor', [1, 1, 1], ...
-                'Position', [0.1, 0.25, 0.8, 0.6], ...
-                'String', 'STOP MOTORS', ...
-                'FontSize', 28, ...
-                'FontWeight', 'Bold', ...
-                'Callback', @obj.killCallback ...
-                );
+            % Create a kill button to stop motors if desired
+            if obj.StopButton
+                kbf = figure();
+                set( kbf, ...
+                    'MenuBar', 'none', ...
+                    'ToolBar', 'none', ...
+                    'NumberTitle', 'off', ...
+                    'Name', 'Stop Motors', ...
+                    'Resize', 'off', ...
+                    'Position', [100, 100, 400, 200], ...
+                    'Color', [1, 1, 1], ...
+                    'Tag', 'KillButtonFigure', ...
+                    'CloseRequestFcn', @obj.preventFigureClose ...
+                    );
                 
+                killButton = uicontrol( ...
+                    'Units', 'Normalized', ...
+                    'Style', 'pushbutton', ...
+                    'BackgroundColor', 0.8.*[1, 0, 0], ...
+                    'ForegroundColor', [1, 1, 1], ...
+                    'Position', [0.1, 0.25, 0.8, 0.6], ...
+                    'String', 'STOP MOTORS', ...
+                    'FontSize', 28, ...
+                    'FontWeight', 'Bold', ...
+                    'Callback', @obj.killCallback ...
+                    );
+            end
             
-                % Otherwise, return success
-                result = 0;
+            
+            % Otherwise, return success
+            result = 0;
             
         end
         % -----------------------------------------------------------------
@@ -246,7 +253,7 @@ classdef velmex < handle
                         distance_mm = -1.*distance_mm;
                     otherwise
                         result = 'Unknown motor direction.';
-                        return;                        
+                        return;
                 end
             elseif ~isempty( intersect( direction, [1, 2, 3] ) )
                 motorNumber = direction;
@@ -364,7 +371,7 @@ classdef velmex < handle
                     '. Velmex said: ' response ];
                 return;
             end
-                
+            
             
             % Return 0 to indicate no errors
             result = 0;
@@ -385,7 +392,7 @@ classdef velmex < handle
                 result = 'Must connect device (.connectVelmex) first.';
                 return;
             end
-                        
+            
             % Assemble command. It's most efficient to pass as several
             % commands, rather than calling sendCommandAndWait three times
             goToZeroPositionCommand = 'K,F,C,G';
@@ -437,7 +444,7 @@ classdef velmex < handle
             axisNames = {'X', 'Y', 'Z'};
             axisPositions = zeros(1, 3);
             expectedResponse = '';
-                        
+            
             % Query each motor for its position
             for motorCount = 1:3
                 
@@ -536,7 +543,7 @@ classdef velmex < handle
                 axis1 - currentPositions(1), ...
                 axis2 - currentPositions(2), ...
                 axis3 - currentPositions(3) ];
-                        
+            
             % Query each motor for its position
             for motorCount = 1:3
                 
@@ -631,7 +638,7 @@ classdef velmex < handle
             % Assemble kill command
             killCommand = ['F,C,G,K'];
             expectedResponse = '';
-                
+            
             % Send kill command
             [response, timedOut] = sendCommandAndWait( ...
                 obj, killCommand, expectedResponse, 2 );
@@ -645,7 +652,7 @@ classdef velmex < handle
                 % Return 0 to indicate no errors
                 result = 0;
             end
-                
+            
             
         end
         % -----------------------------------------------------------------
@@ -694,7 +701,7 @@ classdef velmex < handle
             % Assemble kill command
             killCommand = ['F,C,G,K'];
             expectedResponse = '';
-                
+            
             % Send kill command
             [response, timedOut] = sendCommandAndWait( ...
                 obj, killCommand, expectedResponse, 2 );
@@ -708,11 +715,11 @@ classdef velmex < handle
                 % Return 0 to indicate no errors
                 result = 0;
             end
-                
+            
             
         end
         % -----------------------------------------------------------------
-                
+        
         % Function to make kill button persistent -------------------------
         function preventFigureClose( obj, src, evnt )
             
@@ -740,7 +747,7 @@ classdef velmex < handle
         
         % Class destructor -----------------------------------------------
         function delete( obj )
-           
+            
             % Close the connection
             fclose( obj.DeviceObject );
             
@@ -750,7 +757,7 @@ classdef velmex < handle
                 close( figure( figureObject.Number ) );
                 figureObject.delete;
             end
-               
+            
         end
         % -----------------------------------------------------------------
         

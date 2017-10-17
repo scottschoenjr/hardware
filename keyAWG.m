@@ -259,8 +259,9 @@ classdef keyAWG < handle
             % Make sure a valid mode was specified
             modeType=lower(modeType);
             invalidMode = ~ismember( modeType, ...
-                {'ext','external','e', ... % External
-                 'imm','immediate','i' ... % Internal
+                {'ext','external','e',  ... % External
+                 'imm','immediate','i', ... % Internal
+                 'man','manual','m'     ... % Manual
                  } );
             if invalidMode
                 result='Invalid mode specified';
@@ -273,10 +274,12 @@ classdef keyAWG < handle
                     modeCommand = 'TRIGger:SOURce EXTernal';
                 case {'imm','immediate','i','im'}
                     modeCommand = 'TRIGger:SOURce IMMediate';
+                case {'man','manual','m'}
+                    modeCommand = 'TRIGger:SOURce MANual';
             end
             
             % Send command
-            result = sendCommand( obj, modeCommand );
+            result = sendCommand( obj, modeCommand, 0, 0 );
             
         end
         % -----------------------------------------------------------------
@@ -396,6 +399,18 @@ classdef keyAWG < handle
             
             % Send to AWG
             result = sendCommand( obj, command );
+            
+        end
+        % -----------------------------------------------------------------
+                
+        % Function to force trigger on device -----------------------------
+        function [result] = forceTrigger( obj )
+            
+            % Assemble command
+            command = [':TRIGger'];
+            
+            % Send to AWG
+            result = sendCommand( obj, command, 0, 0 ); % No delay or reply
             
         end
         % -----------------------------------------------------------------

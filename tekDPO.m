@@ -20,6 +20,10 @@ classdef tekDPO < handle
         % May be due to an impedance mismatch? Not sure.
         VOLTAGE_SCALING = 1E-2;
         
+        % Set default number of acquisitions to average over in average
+        % mode
+        DEFAULT_NUMAVG = 64; % Must be power of 2 [2--256]
+        
     end
     
     % Define class methods
@@ -101,8 +105,8 @@ classdef tekDPO < handle
             obj.DeviceObject = scopeDeviceObject;
             
             % Create a large enough buffer to hold all data
-            horizontalRecordLength = 1E5;
-            bufferSize = 10.*8.*horizontalRecordLength;
+            horizontalRecordLength = 1E6;
+            bufferSize = 2.*8.*horizontalRecordLength;
             
             % Try and set default parameters
             try
@@ -173,6 +177,145 @@ classdef tekDPO < handle
             
         end
         % -----------------------------------------------------------------
+        
+        % Function to set scope mode --------------------------------------
+        function [ result ] = setAcquisitionMode( obj, mode, numAvg )
+            
+            % NOTE: DATA:COMPOSITION settings were troublesome. See here
+            % https://forum.tek.com/viewtopic.php?t=136577
+            
+            % TODO: Add all modes.
+            % DATA:COMPOSITION COMPOSITE_ENV is for envelope mode
+                        
+            % Check if valid mode specified
+            if ~isa( mode, 'char' )
+                result = [ 'WARNING: Acquisition mode not changed. ', ...
+                    'Valid modes are: "Average" and "Sample".' ];
+                return;
+            end
+            mode = lower( mode );
+            
+            switch mode
+                case {'average', 'ave', 'avg', 'av', 'a'}
+                    
+                    % If we're in averaging mode, check for valid number of
+                    % acquisitions to average over (must be power of 2
+                    if nargin < 3
+                        
+                        numAvg = obj.DEFAULT_NUMAVG; % Default
+                        
+                        % --- Verbose Mode ----
+                        if obj.Verbose
+                            disp( [ ...
+                                'TEK: Setting number of aquisitions', ...
+                                ' to average over to ', ...
+                                num2str( numAvg ), '.' ] ...
+                                );
+                        end
+                        % --------------------
+                        
+                    elseif ~isa( numAvg, 'double' )
+                        
+                        numAvg = obj.DEFAULT_NUMAVG; % Default
+                        
+                        % --- Verbose Mode ----
+                        if obj.Verbose
+                            disp( [ ...
+                                'TEK: Number of aquisitions must be a', ...
+                                ' double. Setting to ', ...
+                                num2str( numAvg ), '.' ] ...
+                                );
+                        end
+                        % --------------------
+                        
+                    else
+                        
+                        % Make sure specified number of points is a power
+                        % of 2
+                        powerOf2 = 2.^( nextpow2( floor( abs(numAvg) ) ) );
+                        % Make sure in valid range
+                        numAvg = max( 2, min( powerOf2, 256 ) );
+                        
+                    end
+                    
+                    % Set to averaging mode
+                    fprintf( obj.DeviceObject, 'ACQuire:MODe AVErage' ); 
+                    
+                    % Set number of acquisitions
+                    numAcqCommand = ...
+                        [ 'ACQuire:NUMAVg ', num2str( numAvg ) ];
+                    fprintf( obj.DeviceObject, numAcqCommand );
+                    
+                    % Do this stupid thing. SaveData will fail (VISA
+                    % timeout) if this setting isn't set when changing to
+                    % averaging mode.
+                    fprintf( obj.DeviceObject, ...
+                        'DATA:COMPOSITION SINGULAR_YT' );
+                    
+                    % TODO: Add check to verify setting
+                    
+                    % --- Verbose Mode ----
+                    if obj.Verbose
+                        disp( [ ...
+                            'TEK: Set to averaging mode with ', ...
+                            num2str( numAvg ), ' acquisitions.' ] ...
+                            );
+                    end
+                    % --------------------
+                    
+                    % Return success
+                    result = 0;
+                    return;
+                    
+                case {'sample', 'sampling', 'samp', 'sam', 's'}
+                    
+                    % Set to averaging mode
+                    fprintf( obj.DeviceObject, 'ACQuire:MODe SAMple' ); 
+                    
+                    % Set composition mode to composite
+                    fprintf( obj.DeviceObject, ...
+                        'DATA:COMPOSITION COMPOSITE_YT' );
+                    
+                    % --- Verbose Mode ----
+                    if obj.Verbose
+                        disp( ...
+                            'TEK: Set to sampling (continuous) mode.' ...
+                            );
+                    end
+                    % --------------------
+                    
+                    % Return success
+                    result = 0;
+                    return;
+                    
+                    
+                otherwise
+                    
+                    % --- Verbose Mode ----
+                    if obj.Verbose
+                        disp( ...
+                            'TEK: Unknown mode, keeping current mode.' ...
+                            );
+                    end
+                    % --------------------
+                    
+                    
+                    % Warn user, and exit without changing anything
+                    result = [ 'WARNING: Unknown acquisition mode ' ...
+                        ' specified; mode was not changed. ', ...
+                        'Valid modes are: "Average" and "Sample".' ];
+                    
+                    return;
+                    
+            end
+                    
+            
+            % Get status from device object
+            scopeStatus = obj.DeviceObject;
+            
+        end
+        % -----------------------------------------------------------------
+        
         
         % Function to get entire data record from scope -------------------
         %   Can also specify a subset of the data to get by specifying a
@@ -276,7 +419,7 @@ classdef tekDPO < handle
             % ASCII encoding for now
             fprintf( obj.DeviceObject, ...
                 'DATA:ENCDG ASCII' );
-            
+                       
             % --- Verbose Mode ---
             if obj.Verbose
                 disp( 'TEK: Set data transfer format successfully.' );
