@@ -298,6 +298,9 @@ classdef velmex < handle
             if ~isa( distance_mm, 'double' )
                 result = 'Motor distance must be a number [mm].';
                 return;
+            elseif distance_mm < 5E-3
+                result = 'Minimum step size is 5 micrometers.';
+                return;
             elseif abs(numSteps) > maxSteps
                 numSteps = sign(numSteps).*maxSteps;
             end
