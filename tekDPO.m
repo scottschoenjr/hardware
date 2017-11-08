@@ -1,5 +1,14 @@
-% Class definition to make basic operations with Tektronix DPO 2022B
-% oscilloscope a bit easier.
+%**************************************************************************
+%
+%  Tektronix Oscilloscope Class
+%
+%   Class definition for basic operation of Tektronix DPO 2022B Scope
+%   System (3DPS).
+%
+%
+%              Scott Schoen Jr | Georgia Tech | 20170301
+%
+%**************************************************************************
 
 classdef tekDPO < handle
     
@@ -365,7 +374,7 @@ classdef tekDPO < handle
             end
             
             % Check if too many points were specified
-            endPoint = totalPoints + startPoint - 1;
+            endPoint = numPoints + startPoint - 1;
             tooManyPoints = numPoints > endPoint;
             if tooManyPoints
                 result = [ 'Must specify no more than ', ...
@@ -732,8 +741,9 @@ classdef tekDPO < handle
         end
         % -----------------------------------------------------------------
         
-        % Function to get current scope sampling frequency ---------------------
-        function [ samplingFrequency, result ] = getSamplingFrequency( obj )
+        % Function to get current scope sampling frequency ----------------
+        function [ samplingFrequency, result ] = ...
+                getSamplingFrequency( obj )
             
             % Initialize
             samplingFrequency = NaN;
@@ -762,6 +772,104 @@ classdef tekDPO < handle
             
             % Compute and return the sampling frequency in hertz
             samplingFrequency = screenWidthSamples./screenWidthSeconds;
+            
+            % Return success
+            result = 0;
+            
+            
+        end
+        % -----------------------------------------------------------------
+        
+        % Function to get the peak-to-peak value of the waveform ----------
+        function [ pk2pkVoltage, result ] = getPeak2Peak( obj, channel )
+            
+            % Initialize
+            pk2pkVoltage = NaN;
+            result = NaN;
+            
+            % Default to channel 1
+            if nargin < 2 || ~isa( channel, 'double' )
+                channel = 1;
+            elseif channel > 2 || channel < 1
+                channel = 1;
+            end
+            channel = abs(round(channel)); % Just to be sure
+            
+            % Add an "immediate measurement" which will not display on the
+            % scope screen and will allow us to get the peak-to-peak
+            % voltage.
+            try
+                
+                commandString = sprintf( ...
+                    'MEASUrement:IMMed:SOUrce1 CH%1d.', ...
+                    channel ); 
+                obj.sendCommand(commandString, 0, 0);
+                
+            catch
+                
+                result = 'Couldn''t set immedaite measurement type.';
+                return;
+                
+            end
+            % --- Verbose Mode ---
+            if obj.Verbose
+                verboseString = sprintf( ...
+                    'TEK: Added immediate measurement of CH%1d.', ...
+                    channel );
+                disp( verboseString );
+            end
+            % --------------------
+            
+            % Make it a peak-to-peak measurement
+            try
+
+                obj.sendCommand('MEASUrement:IMMed:TYPe PK2Pk', 0, 0);
+                
+            catch
+                
+                result = 'Couldn''t set immedaite measurement type.';
+                return;
+                
+            end
+            % Make sure measurement type was set properly
+            measurementType = obj.sendCommand( 'MEASUrement:IMMed:TYPe?' );
+            commandSent = strcmpi( measurementType(1:4), 'pk2p'  );
+            if ~commandSent
+                result = [ ...
+                    'Unable to set immediate measurement type to ', ...
+                    'peak-to-peak. Current type is "', ...
+                    measurementType, '".' ...
+                    ];
+                return;
+            end
+            % --- Verbose Mode ---
+            if obj.Verbose
+                verboseString = sprintf( ...
+                    'TEK: Set (immediate) PK2PK measurement of CH%1d.', ...
+                    channel );
+                disp( verboseString );
+            end
+            % --------------------
+            
+            % Now get the peak to peak voltage
+            % --- Verbose Mode ---
+            if obj.Verbose
+                verboseString = sprintf( ...
+                    'TEK: Getting PK2PK value of CH%1d.', ...
+                    channel );
+                disp( verboseString );
+            end
+            % --------------------
+            try
+                
+                pk2pkVoltage = str2double( ...
+                    obj.sendCommand('MEASUrement:IMMed:VALue?'));
+                
+            catch
+                result = [ ...
+                    'Unknown error while getting peak-to-peak value' ];
+            end
+
             
             % Return success
             result = 0;
@@ -813,6 +921,7 @@ classdef tekDPO < handle
             end
             
         end
+        
         
         
         % Class destructor

@@ -43,11 +43,11 @@ classdef velmex < handle
             obj.Manufacturer = 'Velmex';
             obj.ManufacturerID = ''; % No MATLAB designation
             obj.Model = 'BiSlide';
-            obj.ResourceName = 'COM4';
+            obj.ResourceName = 'COM3';
             obj.DeviceObject = 'Not Initialized';
             
             % COM Port default settings
-            obj.ComSettings.ComPort = 4;
+            obj.ComSettings.ComPort = 3;
             obj.ComSettings.BaudRate = 9600;
             obj.ComSettings.DataBits = 8;
             obj.ComSettings.Parity = 'none';
@@ -274,8 +274,8 @@ classdef velmex < handle
             if ~isa( stepsPerSecond, 'double' )
                 result = 'Motor speed must be a postitive number [mm/s]';
                 return;
-            elseif stepsPerSecond > 6000
-                stepsPerSecond = 6000;
+            elseif stepsPerSecond > 4000
+                stepsPerSecond = 4000;
             elseif stepsPerSecond < 1
                 stepsPerSecond = 1;
             end
@@ -292,14 +292,18 @@ classdef velmex < handle
                 return;
             end
             
+            % Check if specified distance is 0 (passing 0 will cause the
+            % motor to run away, so just return here instead).
+            if distance_mm == 0
+                result = 0;
+                return;
+            end
+            
             % Assemble movement command
             numSteps = round( distance_mm.*obj.stepsPerMillimeter );
             maxSteps = obj.maxTravelDistance.*obj.stepsPerMillimeter;
             if ~isa( distance_mm, 'double' )
                 result = 'Motor distance must be a number [mm].';
-                return;
-            elseif distance_mm < 5E-3
-                result = 'Minimum step size is 5 micrometers.';
                 return;
             elseif abs(numSteps) > maxSteps
                 numSteps = sign(numSteps).*maxSteps;
