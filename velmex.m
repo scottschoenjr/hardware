@@ -27,7 +27,7 @@ classdef velmex < handle
     properties (Constant, Hidden)
         
         % Set slider conversion
-        stepsPerMillimeter = 160; % 1 step = 1/400th of a millimeter
+        stepsPerMillimeter = 160; % 1 step = 1/160th of a millimeter
         % Set max travel distance (per command)
         maxTravelDistance = 50; % [mm]
         
@@ -53,6 +53,7 @@ classdef velmex < handle
             obj.ComSettings.Parity = 'none';
             obj.ComSettings.StopBits = 1;
             obj.ComSettings.Terminator = 'CR';
+            obj.ComSettings.InputBufferSize = 2048;
             obj.ComSettings.Timeout = 0.1;
             
             % Set the button to off initially. It can be enabled by setting
@@ -103,13 +104,18 @@ classdef velmex < handle
                     'Databits', obj.ComSettings.DataBits, ...
                     'Parity', obj.ComSettings.Parity, ...
                     'StopBits', obj.ComSettings.StopBits, ...
-                    'Terminator', obj.ComSettings.Terminator, ...
+                    'Terminator', obj.ComSettings.Terminator, ... 
+                    'InputBufferSize', obj.ComSettings.InputBufferSize, ...
                     'Timeout', obj.ComSettings.Timeout ...
                     );
             catch
                 result = 'Couldn''t create device object.';
                 return;
             end
+            
+            % Buffer size?
+            % obj.ComSettings.InputBufferSize = 2048;
+            % 'InputBufferSize', obj.ComSettings.InputBufferSize, ...
             
             % Update object properties
             obj.DeviceObject = velmexObject;
@@ -132,9 +138,26 @@ classdef velmex < handle
                 return;
             end
             
+%             % Clear any existing commands or programs
+%             % K - Kill any running programs
+%             % C - Clear
+%             [response, timedOut] = ...
+%                 sendCommandAndWait( obj, 'KC', '^', 1 );
+%             if timedOut
+%                 result = [ ...
+%                     'Something went wrong clearing 3DPS memory. ', ...
+%                     'When I tried, the Velmex didn''t respond as ', ...
+%                     'expected. It said: ', response...
+%                     ];
+%                 return;
+%             end
+            
+            
             % Verify that VMX is connected and responding
+            % V - Verify status
+            % F - Echo off [E = on]
             [response, timedOut] = ...
-                sendCommandAndWait( obj, 'V', 'R', 2 );
+                sendCommandAndWait( obj, 'VF', 'R', 2 );
             if timedOut
                 result = [ 'Comm check timed out. ', ...
                     'Velmex didn''t report ready, though ', ...
@@ -143,6 +166,9 @@ classdef velmex < handle
                     ];
                 return;
             end
+            
+            % Resize buffer so that we don't run out of space
+            obj.DeviceObject
             
             % Create a kill button to stop motors if desired
             if obj.StopButton
@@ -364,7 +390,7 @@ classdef velmex < handle
             % the "zero", and returns to this position whenever the return
             % to 0 command ("IA[motor #]M0") is issued. Making this
             % position Null will allow us to get its position too.
-            setZeroPositionCommand = [ setZeroPositionCommand, 'N,R' ];
+            setZeroPositionCommand = [ setZeroPositionCommand, ',N,R' ];
             
             % Send command
             [response, timedOut] = sendCommandAndWait( ...
@@ -402,7 +428,8 @@ classdef velmex < handle
             
             % Assemble command. It's most efficient to pass as several
             % commands, rather than calling sendCommandAndWait three times
-            goToZeroPositionCommand = 'K,F,C,G';
+%             goToZeroPositionCommand = 'K,F,C,G';
+            goToZeroPositionCommand = 'K,F,C';
             for motorCount = 1:3
                 
                 % Append current motor and setting
@@ -556,7 +583,7 @@ classdef velmex < handle
                 
                 % Compute number of steps
                 motorDistance = axisDistances(motorCount);
-                motorSpeed = 1; % [mm/s]
+                motorSpeed = 5; % [mm/s]
                 
                 % Use move command (1.3 safety factor should be enough)
                 % If this is causing problems, consider assembling commands

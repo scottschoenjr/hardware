@@ -20,6 +20,7 @@ classdef tekDPO < handle
         ResourceName
         DeviceObject
         Verbose
+        ImmediateMeasurement
     end
     
     % Set constants
@@ -32,7 +33,7 @@ classdef tekDPO < handle
         % Set default number of acquisitions to average over in average
         % mode
         DEFAULT_NUMAVG = 64; % Must be power of 2 [2--256]
-        
+               
     end
     
     % Define class methods
@@ -48,6 +49,8 @@ classdef tekDPO < handle
             obj.ResourceName = 'USB0::0x0699::0x03A1::C030405::0';
             obj.DeviceObject = 'Not Initialized';
             obj.Verbose = 0; % Turn off by default
+            obj.ImmediateMeasurement.type = '';
+            obj.ImmediateMeasurement.channel = 0; % Flag to store the type of immediate measurement set
             
             % Delete any instances of objects using that resource name
             allObjects = instrfind;
@@ -119,6 +122,7 @@ classdef tekDPO < handle
             
             % Try and set default parameters
             try
+                
                 obj.DeviceObject.InputBufferSize = bufferSize;
                 obj.DeviceObject.OutputBufferSize = bufferSize;
                 
@@ -132,6 +136,9 @@ classdef tekDPO < handle
             catch
                 result = 'Couldn''t size buffers.';
             end
+            
+            scope.DeviceObject.RecordName = ...
+                [datestr(clock, 'yyyymmddTHH:MM:SS'), '.txt'];
             
             % Try and connect to scope
             try
@@ -152,6 +159,7 @@ classdef tekDPO < handle
                 
                 result = 0;
             end
+            
             
         end
         % -----------------------------------------------------------------
@@ -795,21 +803,30 @@ classdef tekDPO < handle
             end
             channel = abs(round(channel)); % Just to be sure
             
+            % Check if we need to make any changes to the measurement type,
+            % channel, etc. If they're the same as ones we've already set,
+            % we don't need to reset them each time.
+            imChannelSet = obj.ImmediateMeasurement.channel == channel;
+            imTypeSet = strcmp( obj.ImmediateMeasurement.type, 'PK2Pk' );
+            
             % Add an "immediate measurement" which will not display on the
             % scope screen and will allow us to get the peak-to-peak
             % voltage.
-            try
-                
-                commandString = sprintf( ...
-                    'MEASUrement:IMMed:SOUrce1 CH%1d.', ...
-                    channel ); 
-                obj.sendCommand(commandString, 0, 0);
-                
-            catch
-                
-                result = 'Couldn''t set immedaite measurement type.';
-                return;
-                
+            if ~imChannelSet
+                try
+                    
+                    commandString = sprintf( ...
+                        'MEASUrement:IMMed:SOUrce1 CH%1d.', ...
+                        channel );
+                    obj.sendCommand(commandString, 0, 0);
+                    
+                catch
+                    
+                    result = 'Couldn''t set immediate measurement type.';
+                    return;
+                    
+                end
+                obj.ImmediateMeasurement.channel = channel;
             end
             % --- Verbose Mode ---
             if obj.Verbose
@@ -821,15 +838,18 @@ classdef tekDPO < handle
             % --------------------
             
             % Make it a peak-to-peak measurement
-            try
-
-                obj.sendCommand('MEASUrement:IMMed:TYPe PK2Pk', 0, 0);
-                
-            catch
-                
-                result = 'Couldn''t set immedaite measurement type.';
-                return;
-                
+            if ~imTypeSet
+                try
+                    
+                    obj.sendCommand('MEASUrement:IMMed:TYPe PK2Pk', 0, 0);
+                    
+                catch
+                    
+                    result = 'Couldn''t set immedaite measurement type.';
+                    return;
+                    
+                end
+                obj.ImmediateMeasurement.type = 'PK2Pk';
             end
             % Make sure measurement type was set properly
             measurementType = obj.sendCommand( 'MEASUrement:IMMed:TYPe?' );
