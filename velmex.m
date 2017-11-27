@@ -8,7 +8,7 @@
 %
 %              Scott Schoen Jr | Georgia Tech | 20170301
 %
-%**************************************************************************
+%*************************************************************************
 
 classdef velmex < handle
     
@@ -466,6 +466,7 @@ classdef velmex < handle
             % Initialize
             result = '';
             response = '';
+            axisPositions = NaN.*ones(1, 3);
             
             % Ensure device is open
             portIsClosed = isequal( obj.DeviceObject.status, 'closed' );

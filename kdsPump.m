@@ -22,6 +22,7 @@ classdef kdsPump < handle
         ComSettings
         Address
         WaitTime
+        Syringe
     end
     
     % Set static properties
@@ -40,13 +41,21 @@ classdef kdsPump < handle
             obj.Manufacturer = 'KDScientific';
             obj.ManufacturerID = ''; % No MATLAB designation
             obj.Model = '110';
-            obj.ResourceName = 'COM5';
+            obj.ResourceName = 'COM4';
             obj.DeviceObject = 'Not Initialized';
             obj.Address = 0; % Will change response format if not 0!
             obj.WaitTime = 0.2; % How long to wait after each command
             
+            % Create syringe struct to store information about syringe
+            syringeStruct = struct( ...
+                'Volume_ml', NaN, ...
+                'InnerDiameter_mm', NaN, ...
+                'Name', '' ...
+                );
+            obj.Syringe = syringeStruct;
+            
             % COM Port default settings
-            obj.ComSettings.ComPort = 5;
+            obj.ComSettings.ComPort = 4;
             obj.ComSettings.BaudRate = 115200;
             obj.ComSettings.DataBits = 8;
             obj.ComSettings.Parity = 'none';
@@ -113,7 +122,11 @@ classdef kdsPump < handle
             try
                 fopen( obj.DeviceObject );
             catch
-                result = 'Couldn''t open serial connection with the pump.';
+                result = [ ...
+                    'Couldn''t open serial connection with the pump. ', ...
+                    'Tried on ', obj.ResourceName, '. Ensure that ', ...
+                    'this is the correct port.' ...
+                    ];
                 return;
             end
             
@@ -193,9 +206,13 @@ classdef kdsPump < handle
             
             % Check inputs
             if ~isa( diameter_mm, 'double' )
-                result( 'Diameter must be a double specified in millimeters' );
+                result = ...
+                    'Diameter must be a double specified in millimeters';
                 return;
             end
+            
+            % Store diameter to syringe struct
+            obj.Syringe.InnerDiameter_mm = diameter_mm;
             
             % Send command
             diameterCommand = sprintf( 'diameter %06.2f', diameter_mm );
@@ -229,13 +246,19 @@ classdef kdsPump < handle
             
             % Check inputs
             if ~isa( diameter_mm, 'double' )
-                result( 'Diameter must be a double specified in millimeters' );
+                result = ...
+                    'Diameter must be a double specified in millimeters.';
                 return;
             end
             if ~isa( svolume_ml, 'double' )
-                result( 'Syringe volume must be a double specified in milliliters' );
+                result = ...
+                    'Syringe volume must be a double specified in milliliters.';
                 return;
             end
+            
+            % Store properties to syringe struct
+            obj.Syringe.InnerDiameter_mm = diameter_mm;
+            obj.Syringe.Volume_ml = svolume_ml;
             
             % Send command
             diameterCommand = sprintf( 'diameter %06.2f', diameter_mm );
@@ -244,9 +267,7 @@ classdef kdsPump < handle
             svolumeCommand = sprintf( 'svolume %06.2f ml', svolume_ml );
             [response2, ~] = ...
                 sendCommandAndWait( obj, svolumeCommand, 0, 0 );
-            response = [{response1},{response2}];
-            
-            
+            response = [{response1},{response2}];            
             
             % Return 0 to indicate no errors
             result = 0;
@@ -257,8 +278,7 @@ classdef kdsPump < handle
         
         % Function to set continuous mode ---------------------------------
         function [result, response] = ...
-                runContinuous( obj, volume_ml, rate_mlPerMin )
-            
+                runContinuous( obj, volume_ml, rate_mlPerMin )            
             
             % Initialize
             result = '';
@@ -272,6 +292,15 @@ classdef kdsPump < handle
             
             if portIsClosed
                 result = 'Must connect device (.connectPump) first.';
+                return;
+            end
+            
+            % Make sure syringe properties have been set
+            syringeNotInitialized = ...
+                isnan( obj.Syringe.Volume_ml ) || ...
+                isnan( obj.Syringe.InnerDiameter_mm ) ;
+            if syringeNotInitialized
+                result = 'Must set syringe parameters first.';
                 return;
             end
             
@@ -329,15 +358,13 @@ classdef kdsPump < handle
         end
         % -----------------------------------------------------------------
         
-        % Function to set continuous mode ---------------------------------
-        function [result, response] = runOneWay( obj, ...
-                volume_ml, rate_mlPerMin, infuseOrWidthdraw )
-            
+        % Function to infuse a specified amount ---------------------------
+        function [result, response] = infuse( obj, ...
+                volume_ml, rate_mlPerMin, infuseOrWidthdraw )            
             
             % Initialize
             result = '';
-            response = '';
-            
+            response = '';            
             
             % Ensure device is open
             portIsClosed = ...
@@ -349,38 +376,21 @@ classdef kdsPump < handle
                 return;
             end
             
-            % Determine appropriate mode
-            if nargin < 3
-                infuseOrWidthdraw = 'i';
-            end
-
-            if isa( infuseOrWidthdraw, 'char' )
-                infuseOrWidthdraw = lower( infuseOrWidthdraw );
-            end
-            
-            % Set pump to infuse or withdraw mode
-            switch infuseOrWidthdraw
-                % Set to infuse mode
-                case {'i', 'infuse', 1}
-                    infuseOrWithdraw = 1;
-                    modeCommand = '@load qs i';
-                % Set to withdraw mode
-                case {'w', 'withdraw', 2}
-                    infuseOrWithdraw = 2;
-                    modeCommand = '@load qs w';
-                % Return if mode unknown
-                otherwise
-                    result = [ 'Unknown withdraw or infuse mode. ', ...
-                        ' (''w'' or ''i'').' ];
-                    return;
+            % Make sure syringe properties have been set
+            syringeNotInitialized = ...
+                isnan( obj.Syringe.Volume_ml ) || ...
+                isnan( obj.Syringe.InnerDiameter_mm ) ;
+            if syringeNotInitialized
+                result = 'Must set syringe parameters first.';
+                return;
             end
             
-            % Set device to infuse-withdraw mode
-
+            % Set pump to infuse mode
+            modeCommand = '@load qs i';
             [rslt, rply] = obj.sendKdsCommand( modeCommand, 0, 0 );
             if ~isequal( rslt, 0 )
-                result = [ 'Couldn''t set mode. Pump said: ', ...
-                    rply ];
+                result = [ 'Couldn''t set to infuse mode. ', ...
+                    'Pump said: ', rply ];
                 return;
             end
             
@@ -395,14 +405,9 @@ classdef kdsPump < handle
             end
             
             % Set the flow rate
-            if infuseOrWithdraw == 1                
-                rateCommand = sprintf( ....
-                    'irate %6.2f ml/min', rate_mlPerMin );
-            else
-                rateCommand = sprintf( ....
-                    'wrate %6.2f ml/min', rate_mlPerMin );                
-            end
-            
+            rateCommand = sprintf( ....
+                'irate %6.2f ml/min', rate_mlPerMin );
+
             % Pass command
             [rslt, rply] = obj.sendKdsCommand( rateCommand, 0, 0 );
             if ~isequal( rslt, 0 )
@@ -421,6 +426,79 @@ classdef kdsPump < handle
             
             % We're off and running, so return and cede command back to
             % main script
+            result = 0;
+            return;
+            
+        end
+        % -----------------------------------------------------------------
+        
+        % Function to withdraw a specified amount ---------------------------
+        function [result, response] = withdraw( obj, ...
+                volume_ml, rate_mlPerMin )          
+            
+            % Initialize
+            result = '';
+            response = '';   
+            
+            % Ensure device is open
+            portIsClosed = ...
+                isequal( obj.DeviceObject, 'Not Initialized' ) || ...
+                isequal( obj.DeviceObject.status, 'closed' );
+            
+            if portIsClosed
+                result = 'Must connect device (.connectPump) first.';
+                return;
+            end
+            
+            % Make sure syringe properties have been set
+            syringeNotInitialized = ...
+                isnan( obj.Syringe.Volume_ml ) || ...
+                isnan( obj.Syringe.InnerDiameter_mm ) ;
+            if syringeNotInitialized
+                result = 'Must set syringe parameters first.';
+                return;
+            end
+            
+            % Set pump to withdraw mode
+            modeCommand = '@load qs w';
+            [rslt, rply] = obj.sendKdsCommand( modeCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set to withdraw mode. ', ...
+                    'Pump said: ', rply ];
+                return;
+            end
+            
+            % Set device target volume
+            targetVolumeCommand = sprintf( ....
+                'tvolume %6.4f ml', volume_ml );
+            [rslt, rply] = obj.sendKdsCommand( targetVolumeCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set target volume. Pump said: ', ...
+                    rply ];
+                return;
+            end
+            
+            % Set the flow rate
+            rateCommand = sprintf( ...
+                'wrate %6.2f ml/min', rate_mlPerMin );                
+            
+            % Pass command
+            [rslt, rply] = obj.sendKdsCommand( rateCommand, 0, 0 );
+            if ~isequal( rslt, 0 )
+                result = [ 'Couldn''t set withdraw flow rate. ', ...
+                    'Pump said: ', rply ];
+                return;
+            end
+            
+            % Send command
+            runCommand = 'run';
+            % For some reason the run command doesn't work sometimes. If
+            % you take one or the other of these run commands away, it 
+            % won't always work, but with both it seems to work always.
+            [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
+%             [response, ~] = sendCommandAndWait( obj, runCommand, 0, 0 );
+            
+            % Return success
             result = 0;
             return;
 

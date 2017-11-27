@@ -3,7 +3,7 @@
 %  Tektronix Oscilloscope Class
 %
 %   Class definition for basic operation of Tektronix DPO 2022B Scope
-%   System (3DPS).
+%   System.
 %
 %
 %              Scott Schoen Jr | Georgia Tech | 20170301
