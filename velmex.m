@@ -29,7 +29,7 @@ classdef velmex < handle
         % Set slider conversion
         stepsPerMillimeter = 160; % 1 step = 1/160th of a millimeter
         % Set max travel distance (per command)
-        maxTravelDistance = 50; % [mm]
+        maxTravelDistance = 100; % [mm]
         
     end
     
@@ -166,10 +166,7 @@ classdef velmex < handle
                     ];
                 return;
             end
-            
-            % Resize buffer so that we don't run out of space
-            obj.DeviceObject
-            
+                        
             % Create a kill button to stop motors if desired
             if obj.StopButton
                 kbf = figure();
@@ -583,14 +580,20 @@ classdef velmex < handle
             for motorCount = 1:3
                 
                 % Compute number of steps
-                motorDistance = axisDistances(motorCount);
+                motorDistance = axisDistances(motorCount); % [mm/s]
                 motorSpeed = 5; % [mm/s]
+                
+                % Compute the wait time. Shorter moves should have longer
+                % wait times.
+                expectedTime = abs(motorDistance)./motorSpeed;
+                waitTime = 3 - 0.6.*expectedTime;
+                waitTime = max( waitTime, 1.3 ); % Make at least 1.3
                 
                 % Use move command (1.3 safety factor should be enough)
                 % If this is causing problems, consider assembling commands
                 % and then sending comma-separated to VXM
-                [result, response] = ...
-                    obj.move( motorCount, motorDistance, motorSpeed, 1.3 );
+                [result, response] = obj.move( ...
+                    motorCount, motorDistance, motorSpeed, waitTime );
                 
                 % Make sure device responed as expected
                 if ~isequal( result, 0 )
@@ -607,7 +610,7 @@ classdef velmex < handle
             
         end
         % -----------------------------------------------------------------
-        
+                
         % Function to display kill button if it's been closed -------------
         function [ result ] = showKillButton( obj )
             

@@ -15,6 +15,7 @@ classdef keyAWG < handle
         ModelCode
         ResourceName
         DeviceObject
+        OutputStatus
     end
     
     
@@ -29,6 +30,7 @@ classdef keyAWG < handle
             obj.ModelCode = '0x4807';
             obj.ResourceName = 'USB0::0x0957::0x4807::MY53300703::0::INSTR';
             obj.DeviceObject = 'Not Initialized';
+            obj.OutputStatus = 'Off';
             
             % % Delete any instances of objects using that resource name
             allObjects = instrfind;
@@ -94,6 +96,14 @@ classdef keyAWG < handle
                 fprintf (obj.DeviceObject, '*CLS');
             catch
                 result = 'Couldn''t clear the wavegen';
+                return;
+            end
+            
+            % Try and turn off output
+            try
+                fprintf (obj.DeviceObject, 'OUTP 0');
+            catch
+                result = 'Couldn''t ensure output was off';
                 return;
             end
             
@@ -385,6 +395,9 @@ classdef keyAWG < handle
             % Assemble command
             command = ['OUTP 1'];
             
+            % Update status
+            obj.OutputStatus = 'On';
+            
             % Send to AWG
             result = sendCommand( obj, command );
             
@@ -396,6 +409,9 @@ classdef keyAWG < handle
             
             % Assemble command
             command = ['OUTP 0'];
+            
+            % Update status
+            obj.OutputStatus = 'Off';
             
             % Send to AWG
             result = sendCommand( obj, command );
@@ -411,6 +427,11 @@ classdef keyAWG < handle
             
             % Send to AWG
             result = sendCommand( obj, command, 0, 0 ); % No delay or reply
+            
+            % Warn user if output is off
+            if isequal( obj.OutputStatus, 'Off' );
+                warning( 'Output is Off!' );
+            end
             
         end
         % -----------------------------------------------------------------

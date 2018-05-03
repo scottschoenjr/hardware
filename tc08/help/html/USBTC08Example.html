@@ -1,0 +1,404 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>USB TC-08 Thermocouple Data Logger Example</title><meta name="generator" content="MATLAB 9.2"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2017-05-18"><meta name="DC.source" content="USBTC08Example.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h1>USB TC-08 Thermocouple Data Logger Example</h1><!--introduction--><p>This script demonstrates how to:</p><div><ul><li>Open a connection to USB TC-08 Thermocouple Data Logger</li><li>Configure the Cold-Junction Channel and Channel 1</li><li>Set the mains filter</li><li>Take some readings</li><li>Plot the data</li><li>Close a connection to the unit</li></ul></div><p>Please refer to the <a href="https://www.picotech.com/download/manuals/usb-tc08-thermocouple-data-logger-programmers-guide.pdf">USB TC-08 Temperature Logger Programmer's Guide</a> for further information.</p><p>This file can be edited to suit application requirements.</p><p><b>Copyright:</b> &copy; 2014 - 2017 Pico Technology Ltd. All rights reserved.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Clear Command Window and Figures</a></li><li><a href="#2">Load Configuration Information</a></li><li><a href="#3">Load Library</a></li><li><a href="#4">Define Buffers</a></li><li><a href="#5">Open Unit and Display Information</a></li><li><a href="#6">Configure Device</a></li><li><a href="#7">Capture Data</a></li><li><a href="#8">Stop the Device</a></li><li><a href="#9">Close Connection to Unit and Unload Library</a></li></ul></div><h2 id="1">Clear Command Window and Figures</h2><pre class="codeinput">clc;
+close <span class="string">all</span>;
+</pre><h2 id="2">Load Configuration Information</h2><pre class="codeinput">USBTC08Config;
+</pre><h2 id="3">Load Library</h2><pre class="codeinput"><span class="keyword">if</span> (ismac())
+
+    loadlibrary(<span class="string">'libusbtc08.dylib'</span>, @usbtc08MFile, <span class="string">'alias'</span>, <span class="string">'usbtc08'</span>);
+
+    <span class="comment">% Check if the library is loaded</span>
+    <span class="keyword">if</span> ~libisloaded(<span class="string">'usbtc08'</span>)
+
+        error(<span class="string">'Library libusbtc08.dylib or usbtc08MFile not found'</span>);
+
+    <span class="keyword">end</span>
+
+<span class="keyword">elseif</span> (isunix())
+
+    loadlibrary(<span class="string">'libusbtc08.so'</span>, @usbtc08MFile, <span class="string">'alias'</span>, <span class="string">'usbtc08'</span>);
+
+    <span class="comment">% Check if the library is loaded</span>
+    <span class="keyword">if</span> ~libisloaded(<span class="string">'usbtc08'</span>)
+
+        error(<span class="string">'Library libusbtc08.so or usbtc08MFile not found'</span>);
+
+    <span class="keyword">end</span>
+
+<span class="keyword">elseif</span> (ispc())
+
+    loadlibrary(<span class="string">'usbtc08.dll'</span>, @usbtc08MFile);
+
+    <span class="comment">% Check if the library is loaded</span>
+    <span class="keyword">if</span> ~libisloaded(<span class="string">'usbtc08'</span>)
+
+        error(<span class="string">'Library usbtc08.dll or usbtc08MFile not found'</span>);
+
+    <span class="keyword">end</span>
+
+<span class="keyword">else</span>
+
+    error(<span class="string">'USBTC08Example:OSNotSupported'</span>, <span class="string">'Operating system not supported, please contact support@picotech.com'</span>);
+
+<span class="keyword">end</span>
+</pre><h2 id="4">Define Buffers</h2><pre class="codeinput">numSamples = 1024;
+
+pBufferCJ       = libpointer(<span class="string">'singlePtr'</span>,zeros(numSamples, 1, <span class="string">'single'</span>));
+pBufferCh1      = libpointer(<span class="string">'singlePtr'</span>,zeros(numSamples, 1, <span class="string">'single'</span>));
+pBufferTimes    = libpointer(<span class="string">'int32Ptr'</span>,zeros(numSamples, 1, <span class="string">'int32'</span>));
+overflow        = libpointer(<span class="string">'int16Ptr'</span>,zeros(1, 1, <span class="string">'int16'</span>));
+</pre><h2 id="5">Open Unit and Display Information</h2><pre class="codeinput">unithandle = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_open_unit'</span>);
+
+<span class="keyword">if</span> unithandle &gt; 0
+
+    disp(<span class="string">'Connected to USB TC-08 device...'</span>);
+    fprintf(<span class="string">'\n'</span>);
+
+<span class="keyword">elseif</span> unithandle == 0
+
+    warning(<span class="string">'USBTC08Example:NoMoreUnitsFound'</span>, <span class="string">'No more USB TC-08 units found'</span>);
+
+<span class="keyword">else</span>
+
+    unloadlibrary(<span class="string">'usbtc08'</span>);
+    error(<span class="string">'USBTC08Example:UnitFailedToOpen'</span>, <span class="string">'Unit failed to open.'</span>);
+    <span class="keyword">return</span>;
+
+<span class="keyword">end</span>
+
+<span class="comment">% Get unit information</span>
+
+infoString = blanks(512);
+
+[status.unitinfo, infostring] = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_get_formatted_info'</span>, <span class="keyword">...</span>
+    unithandle, infoString, length(infoString));
+
+disp(infostring);
+
+error = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_get_last_error'</span>, unithandle);
+</pre><pre class="codeoutput">Connected to USB TC-08 device...
+
+Driver version: 1.10.0.2
+Picopp.sys version: 01.00
+Hardware version: 1
+Unit variant: 3
+Batch and serial: AS299/706
+Calibration date: 15Apr11
+</pre><h2 id="6">Configure Device</h2><pre class="codeinput"><span class="comment">% Set up channels</span>
+
+usbtc08MaxChannels = usbtc08Enuminfo.enUSBTC08Channels.USBTC08_MAX_CHANNELS;
+typek = <span class="string">'K'</span>;
+
+<span class="comment">% Enable Cold Junction and Channel 1</span>
+<span class="keyword">for</span> n = 1:2
+
+    status.setChannel = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_set_channel'</span>, unithandle, <span class="keyword">...</span>
+        (n - 1), int8(typek));
+
+<span class="keyword">end</span>
+
+<span class="comment">% Set mains filter to 50Hz</span>
+
+status.mainsFilter = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_set_mains'</span>, unithandle, 0);
+
+<span class="comment">% Find minimum sampling interval</span>
+min_interval_ms = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_get_minimum_interval_ms'</span>, unithandle)
+</pre><pre class="codeoutput">
+min_interval_ms =
+
+   200
+
+</pre><h2 id="7">Capture Data</h2><pre class="codeinput">interval = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_run'</span>, unithandle, <span class="keyword">...</span>
+    min_interval_ms)
+
+disp(<span class="string">'Collecting data for 10 seconds, please wait...'</span>);
+
+<span class="comment">% Wait for 10 seconds before collecting data - use a loop to keep on</span>
+<span class="comment">% collecting data.</span>
+
+pause(10);
+
+[numValuesCJ, pBufferCJ, pBufferTimes, overflow] = calllib(<span class="string">'usbtc08'</span>, <span class="keyword">...</span>
+    <span class="string">'usb_tc08_get_temp'</span>, unithandle, pBufferCJ, pBufferTimes, numSamples, <span class="keyword">...</span>
+    overflow, 0, 0, 0);
+
+
+[numValuesCh1, pBufferCh1, pBufferTimes, overflow] = calllib(<span class="string">'usbtc08'</span>, <span class="keyword">...</span>
+    <span class="string">'usb_tc08_get_temp'</span>, unithandle, pBufferCh1, pBufferTimes, numSamples, <span class="keyword">...</span>
+    overflow, 1, 0, 0);
+
+disp(<span class="string">'Data collection complete, plotting data.'</span>);
+
+<span class="comment">% Plot data</span>
+
+figure(<span class="string">'Name'</span>,<span class="string">'USB TC-08 Thermocouple Data Logger Example'</span>, <span class="keyword">...</span>
+    <span class="string">'NumberTitle'</span>, <span class="string">'off'</span>);
+plot(pBufferTimes(1:numValuesCJ), pBufferCJ(1:numValuesCJ), pBufferTimes(1:numValuesCh1), pBufferCh1(1:numValuesCh1))
+grid <span class="string">on</span>;
+title(<span class="string">'Plot of Temperature vs. Time'</span>);
+xlabel(<span class="string">'Time (ms)'</span>)
+ylabel(<span class="string">'Temperature, degrees &deg;C'</span>)
+legend (<span class="string">'Cold Junction'</span>,<span class="string">'Channel 1'</span>)
+</pre><pre class="codeoutput">
+interval =
+
+   200
+
+Collecting data for 10 seconds, please wait...
+Data collection complete, plotting data.
+</pre><img vspace="5" hspace="5" src="USBTC08Example_01.png" alt=""> <h2 id="8">Stop the Device</h2><pre class="codeinput">stop = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_stop'</span>, unithandle);
+
+error = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_get_last_error'</span>, unithandle);
+</pre><h2 id="9">Close Connection to Unit and Unload Library</h2><pre class="codeinput">exit = calllib(<span class="string">'usbtc08'</span>, <span class="string">'usb_tc08_close_unit'</span>, unithandle);
+
+unloadlibrary(<span class="string">'usbtc08'</span>);
+</pre><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2017a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%% USB TC-08 MATLAB EXAMPLE
+% This script demonstrates how to:
+%
+% * Open a connection to USB TC-08 Thermocouple Data Logger
+% * Configure the Cold-Junction Channel and Channel 1
+% * Set the mains filter
+% * Take some readings
+% * Plot the data
+% * Close a connection to the unit
+%
+% Please refer to the
+% <https://www.picotech.com/download/manuals/usb-tc08-thermocouple-data-logger-programmers-guide.pdf USB TC-08 Temperature Logger Programmer's Guide> for further information.
+%
+% This file can be edited to suit application requirements.
+%
+% *Copyright:* © 2014 - 2017 Pico Technology Ltd. All rights reserved.
+
+%% Clear Command Window and Figures
+
+clc;
+close all;
+
+%% Load Configuration Information
+
+USBTC08Config;
+
+%% Load Library
+
+if (ismac())
+    
+    loadlibrary('libusbtc08.dylib', @usbtc08MFile, 'alias', 'usbtc08');
+    
+    % Check if the library is loaded
+    if ~libisloaded('usbtc08')
+    
+        error('Library libusbtc08.dylib or usbtc08MFile not found');
+    
+    end
+    
+elseif (isunix())
+    
+    loadlibrary('libusbtc08.so', @usbtc08MFile, 'alias', 'usbtc08');
+    
+    % Check if the library is loaded
+    if ~libisloaded('usbtc08')
+    
+        error('Library libusbtc08.so or usbtc08MFile not found');
+    
+    end
+    
+elseif (ispc())
+   
+    loadlibrary('usbtc08.dll', @usbtc08MFile);
+    
+    % Check if the library is loaded
+    if ~libisloaded('usbtc08')
+    
+        error('Library usbtc08.dll or usbtc08MFile not found'); 
+    
+    end
+    
+else
+    
+    error('USBTC08Example:OSNotSupported', 'Operating system not supported, please contact support@picotech.com');
+    
+end
+
+%% Define Buffers
+
+numSamples = 1024;
+
+pBufferCJ       = libpointer('singlePtr',zeros(numSamples, 1, 'single'));
+pBufferCh1      = libpointer('singlePtr',zeros(numSamples, 1, 'single'));
+pBufferTimes    = libpointer('int32Ptr',zeros(numSamples, 1, 'int32'));
+overflow        = libpointer('int16Ptr',zeros(1, 1, 'int16'));
+
+%% Open Unit and Display Information
+
+unithandle = calllib('usbtc08', 'usb_tc08_open_unit');
+
+if unithandle > 0
+    
+    disp('Connected to USB TC-08 device...');
+    fprintf('\n');
+    
+elseif unithandle == 0
+    
+    warning('USBTC08Example:NoMoreUnitsFound', 'No more USB TC-08 units found');
+    
+else
+   
+    unloadlibrary('usbtc08');
+    error('USBTC08Example:UnitFailedToOpen', 'Unit failed to open.');
+    return;
+    
+end
+
+% Get unit information
+
+infoString = blanks(512);
+
+[status.unitinfo, infostring] = calllib('usbtc08', 'usb_tc08_get_formatted_info', ...
+    unithandle, infoString, length(infoString));
+
+disp(infostring);
+
+error = calllib('usbtc08', 'usb_tc08_get_last_error', unithandle);
+
+%% Configure Device
+
+% Set up channels
+
+usbtc08MaxChannels = usbtc08Enuminfo.enUSBTC08Channels.USBTC08_MAX_CHANNELS;
+typek = 'K';
+
+% Enable Cold Junction and Channel 1
+for n = 1:2
+
+    status.setChannel = calllib('usbtc08', 'usb_tc08_set_channel', unithandle, ...
+        (n - 1), int8(typek));
+    
+end
+
+% Set mains filter to 50Hz
+
+status.mainsFilter = calllib('usbtc08', 'usb_tc08_set_mains', unithandle, 0);
+
+% Find minimum sampling interval
+min_interval_ms = calllib('usbtc08', 'usb_tc08_get_minimum_interval_ms', unithandle)
+
+%% Capture Data
+
+interval = calllib('usbtc08', 'usb_tc08_run', unithandle, ...
+    min_interval_ms)
+
+disp('Collecting data for 10 seconds, please wait...');
+
+% Wait for 10 seconds before collecting data - use a loop to keep on
+% collecting data.
+
+pause(10);
+
+[numValuesCJ, pBufferCJ, pBufferTimes, overflow] = calllib('usbtc08', ...
+    'usb_tc08_get_temp', unithandle, pBufferCJ, pBufferTimes, numSamples, ...
+    overflow, 0, 0, 0);
+
+
+[numValuesCh1, pBufferCh1, pBufferTimes, overflow] = calllib('usbtc08', ...
+    'usb_tc08_get_temp', unithandle, pBufferCh1, pBufferTimes, numSamples, ...
+    overflow, 1, 0, 0);
+
+disp('Data collection complete, plotting data.');
+
+% Plot data
+
+figure('Name','USB TC-08 Thermocouple Data Logger Example', ...
+    'NumberTitle', 'off');
+plot(pBufferTimes(1:numValuesCJ), pBufferCJ(1:numValuesCJ), pBufferTimes(1:numValuesCh1), pBufferCh1(1:numValuesCh1))
+grid on;
+title('Plot of Temperature vs. Time');
+xlabel('Time (ms)')
+ylabel('Temperature, degrees °C')
+legend ('Cold Junction','Channel 1')
+
+%% Stop the Device
+
+stop = calllib('usbtc08', 'usb_tc08_stop', unithandle);
+
+error = calllib('usbtc08', 'usb_tc08_get_last_error', unithandle);
+
+
+%% Close Connection to Unit and Unload Library
+
+exit = calllib('usbtc08', 'usb_tc08_close_unit', unithandle);
+
+unloadlibrary('usbtc08');
+
+
+
+
+##### SOURCE END #####
+--></body></html>
