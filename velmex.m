@@ -581,7 +581,7 @@ classdef velmex < handle
                 
                 % Compute number of steps
                 motorDistance = axisDistances(motorCount); % [mm/s]
-                motorSpeed = 5; % [mm/s]
+                motorSpeed = 3; % [mm/s]
                 
                 % Compute the wait time. Shorter moves should have longer
                 % wait times.

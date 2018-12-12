@@ -776,6 +776,7 @@ classdef tekDPO < handle
                 result = [ ...
                     'Something went wrong trying to get ', ...
                     'the screen resolution.' ];
+                return;
             end
             
             % Compute and return the sampling frequency in hertz
