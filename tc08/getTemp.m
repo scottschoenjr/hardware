@@ -30,6 +30,7 @@ numSamples = 512;
 
 pBufferCJ       = libpointer('singlePtr',zeros(numSamples, 1, 'single'));
 pBufferCh1      = libpointer('singlePtr',zeros(numSamples, 1, 'single'));
+pBufferCh2      = libpointer('singlePtr',zeros(numSamples, 1, 'single'));
 pBufferCh1Last  = libpointer('singlePtr',zeros(1, 1, 'single'));
 pBufferTimes    = libpointer('int32Ptr',zeros(numSamples, 1, 'int32'));
 overflow        = libpointer('int16Ptr',zeros(1, 1, 'int16'));
@@ -64,8 +65,8 @@ error = calllib('usbtc08', 'usb_tc08_get_last_error', unithandle);
 usbtc08MaxChannels = usbtc08Enuminfo.enUSBTC08Channels.USBTC08_MAX_CHANNELS;
 typek = 'K';
 
-% Enable Cold Junction and Channel 1
-for n = 1:2
+% Enable Cold Junction and Channels 1 and 2
+for n = 1:3
     
     status.setChannel = calllib('usbtc08', 'usb_tc08_set_channel', unithandle, ...
         (n - 1), int8(typek));
@@ -87,7 +88,7 @@ interval = calllib('usbtc08', 'usb_tc08_run', unithandle, ...
     min_interval_ms);
 
 % Get the most recent value and
-maxTime = 30;
+maxTime = 180;
 figureCreated = 0;
 tic; % Start timer
 while toc < maxTime
@@ -100,7 +101,11 @@ while toc < maxTime
     % buffers
     [numValuesCh1, pBufferCh1, pBufferTimes, overflow] = calllib('usbtc08', ...
         'usb_tc08_get_temp', unithandle, pBufferCh1, pBufferTimes, numSamples, ...
-        overflow, 1, 0, 1);
+        overflow, 1, 0, 0);
+    
+    [numValuesCh2, pBufferCh2, pBufferTimes, overflow] = calllib('usbtc08', ...
+        'usb_tc08_get_temp', unithandle, pBufferCh2, pBufferTimes, numSamples, ...
+        overflow, 2, 0, 0);
     
     if ~figureCreated
         figure(1)
@@ -112,30 +117,43 @@ while toc < maxTime
         xlabel('Time [s]')
         ylabel('Temperature [°C]')
         xlim([0, maxTime]);
-        ylim([24, 32]);
+        ylim([20, 40]);
         
         % Initialize plot vectors
-        a = [];
-        b = [];
+        a1 = [];
+        b1 = [];
+        a2 = [];
+        b2 = [];
         figureCreated = 1;
     end
     
     % Get updated plot vectors
     tVec = double(pBufferTimes(1:numValuesCh1))./1E3;
-    tempVec = double( pBufferCh1(1:numValuesCh1) );
+    tempVec1 = double( pBufferCh1(1:numValuesCh1) );
+    tempVec2 = double( pBufferCh2(1:numValuesCh2) );
     
-    if ~isempty( tempVec )
+    if ~isempty( tempVec1 )
         
         % Delete old lines
         delete( findobj( 'Tag', 'TempLine' ) );
         
         % Store
-        a = [a, tVec'];
-        b = [b, tempVec'];
-        
+        a1 = [a1, tVec'];
+        b1 = [b1, tempVec1'];
+                
         % Plot, display, and wait
-        plot( a, b, 'k', 'LineWidth', 2.2 );
-        plot( tVec(end), tempVec(end), 'ro', 'LineWidth', 2.2, 'Tag', 'TempLine');
+        plot( a1, b1, 'k', 'LineWidth', 2.2 );
+        plot( a2, b2, 'k', 'LineWidth', 2.2 );
+        
+        plot( tVec(end), tempVec1(end), 'ro', 'LineWidth', 2.2, ...
+            'Tag', 'TempLine');
+        
+        if ~isempty( tempVec2 )
+            a2 = [a2, tVec'];
+            b2 = [b2, tempVec2'];
+            plot( tVec(end), tempVec2(end), 'bo', 'LineWidth', 2.2, ...
+                'Tag', 'TempLine');            
+        end
         drawnow();
     else
         toc

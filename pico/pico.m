@@ -57,12 +57,12 @@ classdef pico < handle
         DEFAULT_DATA_RESOLUTION = 12; % [bit]  
         
         % Voltage range
-        DEFAULT_VOLTAGE_RANGE = 2; % [V]
+        DEFAULT_VOLTAGE_RANGE = 2; % [V] %2
         
         % Trigger options
         DEFAULT_TRIGGER_CH = 2; % Channel to trigger on
-        DEFAULT_TRIGGER_THRESHOLD = 1; % [V]
-        DEFAULT_TRIGGER_CUTOFF = 5E-3; % [s]
+        DEFAULT_TRIGGER_THRESHOLD = 1; % [V]%1
+        DEFAULT_TRIGGER_CUTOFF = 0; % [s]
         
         % Timing Options
         DEFAULT_PRETRIGGER_TIME = 20E-6;
@@ -123,7 +123,8 @@ classdef pico < handle
                 run( 'PS5000aConfig.m' );
                 
             catch
-                result = 'Couldn''t create device object.';
+                result = [ 'Couldn''t create device object. ', ...
+                    'Make sure PicoScope API is on path.' ];
                 return;
             end
             
@@ -318,7 +319,7 @@ classdef pico < handle
             % Automatically collect data after 1 s if no trigger. Set 0 to
             % wait indefinitely.
             triggerCutoff_s = obj.DEFAULT_TRIGGER_CUTOFF;
-            triggerGroupObj.autoTriggerMs = 1E3.*triggerCutoff_s;
+            triggerGroupObj.autoTriggerMs = 0; %1E3.*triggerCutoff_s; 
             
             % Set trigger settings 
             try
@@ -340,7 +341,7 @@ classdef pico < handle
         end
         % -----------------------------------------------------------------
         
-        % Function to set trigger parameters
+        % Function to set window size
         function [obj, result] = setWindow( obj, startTime, endTime )
             
             % Initialize
@@ -391,9 +392,7 @@ classdef pico < handle
             result = 0;
                         
         end
-        % -----------------------------------------------------------------
-        
-                
+        % -----------------------------------------------------------------           
         
         % Function to display data.
         function [obj, result] = displayData( obj, channels, plotSpectrum )
@@ -465,7 +464,8 @@ classdef pico < handle
             
             xlabel(chAAxes, 'Time [\mus]');
             ylabel(chAAxes, 'Voltage [mV]');
-            grid(chAAxes, 'on');            
+            grid(chAAxes, 'on'); 
+            drawnow();
             
             % Plot FFT if desired
             if plotSpectrum
@@ -492,7 +492,64 @@ classdef pico < handle
                 ylabel(spAxes, 'Level [Arb. dB]');
                 xlabel(spAxes, 'Frequency [MHz]');
                 grid(chAAxes, 'on');
+                drawnow();
             
+            end
+            
+            % If we make it here, return success
+            result = 0;
+            
+        end
+        % -----------------------------------------------------------------v
+        
+        % Function to return data.
+        function [signal, tVec, result] = getData( obj, channels )
+            
+            % Initialize
+            signal = NaN;
+            tVec = NaN;
+            result = '';
+                        
+            % Return data from channel A by default
+            if nargin < 2
+               channels = 1; 
+            elseif ~isequal( channels, 1 ) && ...
+                    ~isequal( channels, 2 )&& ...
+                    ~( ...
+                       isequal( channels, [1,2] ) || ...
+                       isequal( channels, [2,1] ) ...
+                     );
+                 result = 'Invalid channel(s) specified.';
+                 return;
+            end            
+            
+            % Set data retreival values            
+            startIndex = 0;
+            segmentIndex = 0;
+            
+            % No downsampling
+            downsamplingRatio = 1;
+            downsamplingRatioMode = 0;            
+            
+            % Capture a block of data           
+            [status.runBlock] = invoke(obj.BlockObject, 'runBlock', 0);
+            [numSamples, ~, chA, chB] = invoke( obj.BlockObject, ...
+                'getBlockData', startIndex, segmentIndex, ...
+                downsamplingRatio, downsamplingRatioMode);
+            clc;
+            
+            % Get time vector
+            dt = 1./( double(obj.SampleRate) );
+            N = double( numSamples );
+            tVec = ( 0 : N-1 ).*dt;
+            
+            % Assemble data
+            if isequal( channels, 1 )
+                signal = chA;
+            elseif isequal( channels, 2 )
+                signal = chB;
+            else
+                signal = [ chA; chB ];
             end
             
             % If we make it here, return success
@@ -501,7 +558,45 @@ classdef pico < handle
         end
         % -----------------------------------------------------------------
         
-        
+               
+        % Function to get max peak to peak value
+        function [pk2pk, result] = getPk2Pk( obj, channels )
+            
+            % Initialize
+            pk2pk = NaN;
+            result = '';
+                        
+            % Return data from channel A by default
+            if nargin < 2
+               channels = 1; 
+            elseif ~isequal( channels, 1 ) && ...
+                    ~isequal( channels, 2 )&& ...
+                    ~( ...
+                       isequal( channels, [1,2] ) || ...
+                       isequal( channels, [2,1] ) ...
+                     );
+                 result = 'Invalid channel(s) specified.';
+                 return;
+            end            
+            
+            % Get time series data
+            [data, ~, ~] = obj.getData( channels );
+                        
+            % Determine peak to peak values
+            if isequal( channels, 1 ) || isequal( channels, 2 )
+                pk2pk = max( data ) - min( data );
+            else
+                pk2pk_A = max( data(1, :) ) - min( data(1, :) );
+                pk2pk_B = max( data(2, :) ) - min( data(2, :) );
+                pk2pk = [pk2pk_A, pk2pk_B];
+            end
+            
+            % If we make it here, return success
+            result = 0;
+            
+        end
+        % -----------------------------------------------------------------
+                
         % Function to pass other API commands manually
         function [obj, output, result] = ...
                 sendCommand( obj, cmdString )

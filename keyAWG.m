@@ -24,13 +24,34 @@ classdef keyAWG < handle
         % Class constructor -----------------------------------------------
         function obj = keyAWG()
             
-            % Initialize values
-            obj.Manufacturer = 'Agilent Technologies';
-            obj.ManufacturerID = 'agilent'; % Per MATLAB
-            obj.ModelCode = '0x4807';
-            obj.ResourceName = 'USB0::0x0957::0x4807::MY53300703::0::INSTR';
-            obj.DeviceObject = 'Not Initialized';
-            obj.OutputStatus = 'Off';
+            % Set model number
+            MODEL_ID = 'Agilent 33220A';
+            
+            % Initialize values for that model number
+            switch MODEL_ID
+                
+                case 'Agilent 33220A'
+                    
+                    obj.Manufacturer = 'Agilent Technologies';
+                    obj.ManufacturerID = 'agilent'; % Per MATLAB
+                    obj.ModelCode = '0x0407';
+                    obj.ResourceName = ...
+                        'USB0::0x0957::0x0407::MY44024884::0::INSTR';
+                    obj.DeviceObject = 'Not Initialized';
+                    obj.OutputStatus = 'Off';
+                    
+                case {'Keysight 33220A'} % Other Agilent too?
+                    
+                    % Initialize values
+                    obj.Manufacturer = 'Agilent Technologies';
+                    obj.ManufacturerID = 'agilent'; % Per MATLAB
+                    obj.ModelCode = '0x4807';
+                    obj.ResourceName = ...
+                        'USB0::0x0957::0x0407::MY44024884::0::INSTR';
+                    obj.DeviceObject = 'Not Initialized';
+                    obj.OutputStatus = 'Off';
+                    
+            end
             
             % % Delete any instances of objects using that resource name
             allObjects = instrfind;
@@ -86,7 +107,11 @@ classdef keyAWG < handle
             try
                 fopen( obj.DeviceObject );
             catch
-                result = 'Couldn''t connect to AWG (fopen failed).';
+                result = [ ...
+                    'Couldn''t connect to AWG (fopen failed). ', ...
+                    'Check if ResourceName is correct (currently: ', ...
+                    obj.ResourceName, ').' ...
+                    ];
                 return;
             end
             

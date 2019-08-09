@@ -39,7 +39,7 @@ classdef velmex < handle
         % Class constructor -----------------------------------------------
         function obj = velmex()
             
-            % Initialize values
+            % Initialize vapolues
             obj.Manufacturer = 'Velmex';
             obj.ManufacturerID = ''; % No MATLAB designation
             obj.Model = 'BiSlide';
